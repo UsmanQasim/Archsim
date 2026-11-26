@@ -29,7 +29,9 @@ Most system design practice is reading. You draw boxes, you say "add a cache", a
 - **Tune** everything: region, instance size, replicas, shards, Multi-AZ, cache hit rate, users per city, read/write mix, payload, traffic shape.
 - **Break it**: lose a zone, lose a whole region, kill a node, cut a link, add latency, multiply traffic by ten, flush every cache.
 - **See the bill**: per-component monthly cost with tiered data transfer, and a cost tab that finds reserved, spot, ARM and billing-model savings.
-- **Practise** 18 classic interview problems with targets, design checks and a step-by-step reference solution for each.
+- **Practise** 52 interview problems, from a pastebin to a bank ledger, each with targets, design checks and a step-by-step reference solution. Filter by topic and difficulty, and track what you've solved.
+- **Learn** one idea at a time: eight short lessons (latency, scaling, caching, replication, queues, sharding, CDNs, retries), each with a broken system to fix and a live check.
+- **Interview** with it: write your own challenge from a board, send it as a link, and get the candidate's design, scores and notes back as a link. No accounts, no server.
 
 ## Screenshots
 
@@ -38,7 +40,9 @@ Most system design practice is reading. You draw boxes, you say "add a cache", a
 | ![Board with a running global feed](docs/screenshots/hero.png) **The board.** Every number on every box is live. | ![3D model of the same system](docs/screenshots/model.png) **The model.** The same system as a 3D table model, regions as plates. |
 | ![World map](docs/screenshots/map.png) **The map.** Where users are, where their requests land, and what crosses an ocean. | ![A region outage](docs/screenshots/chaos.png) **Chaos.** One click takes N. Virginia offline. |
 | ![Guided solution](docs/screenshots/guide.png) **Guided solutions.** Rebuild the reference design one step at a time, with the reasoning. | ![Growth plan](docs/screenshots/growth.png) **The next 12 months.** Which month the design breaks, and which month it blows the budget. |
-| ![Practice mode in dark theme](docs/screenshots/practice-dark.png) **Practice mode.** A timed mock interview with notes for each stage. | <img src="docs/screenshots/phone-board.png" width="48%" alt="Phone layout: the board" /> <img src="docs/screenshots/phone-details.png" width="48%" alt="Phone layout: component details" /> **Phones and tablets.** Panels slide in. |
+| ![Problem bank](docs/screenshots/problems.png) **52 problems.** Filter by topic and difficulty, solve, or rebuild the answer step by step. | ![Challenge editor](docs/screenshots/editor.png) **Write your own.** Capture the answer from the board, set targets and checks, send a link. |
+| ![A lesson in progress](docs/screenshots/lesson.png) **Lessons.** One idea, one broken system, one live check. | ![Practice mode in dark theme](docs/screenshots/practice-dark.png) **Practice mode.** A timed mock interview with notes for each stage. |
+| <img src="docs/screenshots/phone-board.png" width="48%" alt="Phone layout: the board" /> <img src="docs/screenshots/phone-details.png" width="48%" alt="Phone layout: component details" /> **Phones and tablets.** Panels slide in. | |
 
 ## Everything it does
 
@@ -52,6 +56,9 @@ Most system design practice is reading. You draw boxes, you say "add a cache", a
 | Where the time goes | Pick a group of users to see every hop of an average request: network time, time inside each part, and what share of requests get there. |
 | Compare | Save versions of a design and compare latency, availability, cost and bottleneck side by side. |
 | Estimate | Back-of-envelope maths from daily users to peak requests, bandwidth, storage and rough server counts, then one click to turn it into users on the board. |
+| Problems | 52 problems in 18 topics, Easy to Hard, with search, filters and progress. Each has a reference solution you can rebuild step by step. |
+| Learn | Eight lessons, one concept each. Every lesson loads a board and a task, and ticks the task off the moment the simulation shows it worked. |
+| For interviewers | Build the answer on the board, capture it as solution steps, set targets and design checks (or let ArchSim set targets from your answer), test it, and copy a challenge link. The candidate presses *Send to interviewer* and you get a result link that opens their design with the 24-hour test results, the checks and their notes. Challenges also export and import as JSON. |
 | Practice | 35, 45 or 60 minute mock interviews in five stages with prompts, a timer and a scored summary. Passed challenges are ticked. |
 | Editing | Sticky notes, quick add (`Ctrl K`), copy, paste, duplicate, multi-select, tidy up, undo and redo, day and night themes. |
 | Sharing | Autosave, share links that hold the whole design, JSON import and export, PNG export of the board, and a Markdown design doc with your notes. |
@@ -91,9 +98,13 @@ src/sim/          the engine: no UI, fully unit-tested
   analysis.ts     steady state, breaking point, growth plan, per-hop trace
   catalog.ts      the 29 components: cloud names, pricing, fields, trade-offs
   advisor.ts      recommendation rules and their fixes
-  challenges.ts   18 problems: targets, design checks, staged reference solutions
+  challenges.ts   the classic problems, plus the registry for custom ones
+  problems.ts     more problems, written in the declarative challenge format
+  spec.ts         the challenge format: build, check, diff boards into steps
   regions.ts      regions, cities and distance-based latency
 src/store.ts      app state, undo and redo, autosave, share links
+src/share.ts      challenge links and result links
+src/learn.ts      the lessons
 src/ui/           board, 3D model, world map, panels
 ```
 
@@ -101,15 +112,15 @@ The numbers are teaching approximations, not a capacity plan: about 1 ms of roun
 
 ## Designs as files
 
-Every design is a small JSON document that you can export, import, keep in a repo or generate from a script. Share links carry the same JSON in the address. [docs/FORMAT.md](docs/FORMAT.md) describes it, and a test keeps its example working.
+Every design is a small JSON document that you can export, import, keep in a repo or generate from a script. Share links carry the same JSON in the address. Challenges are JSON too, so a team can keep its interview problems in a repo. [docs/FORMAT.md](docs/FORMAT.md) describes both, and tests keep the examples working.
 
 ## Quality
 
-Every push runs ESLint, the type checker, 32 engine tests (every challenge's reference solution must pass its own targets) and 17 browser tests on desktop and phone sizes, including automated accessibility checks in both themes. Lighthouse on the production build scores 100 for accessibility, best practices and SEO, 100 for desktop performance and about 90 for mobile performance.
+Every push runs ESLint, the type checker, over 100 engine tests (every challenge's reference solution must pass its own targets, its starting board must not, and every challenge must survive a round trip through the editor) and 20 browser tests on desktop and phone sizes, including automated accessibility checks in both themes. Lighthouse on the production build scores 100 for accessibility, best practices and SEO, 100 for desktop performance and about 90 for mobile performance.
 
 ## Contributing
 
-New challenges, components, advisor rules and better numbers are all welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md). A new challenge is one object in `challenges.ts`, and the test suite automatically checks that its reference solution passes.
+New challenges, components, advisor rules and better numbers are all welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md). A new challenge is one object in `src/sim/problems.ts` (or build it in the app under *Problems → Create a challenge* and download the JSON), and the test suite automatically checks that its reference solution passes.
 
 ## Licence
 

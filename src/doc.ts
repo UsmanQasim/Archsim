@@ -1,5 +1,5 @@
 import { CATALOG, SIZES } from './sim/catalog'
-import { CHALLENGES } from './sim/scenarios'
+import { findChallenge } from './sim/scenarios'
 import { locationName } from './sim/engine'
 import { fmtMoney, fmtMs, fmtNum, fmtPct } from './format'
 import { useApp, useSim } from './store'
@@ -15,7 +15,7 @@ export function buildDesignDoc(): string {
   const L: string[] = []
   L.push(`# ${s.title}`, '')
   L.push(`_System design exported from ArchSim on ${new Date().toLocaleDateString()}. Product names shown for ${prov === 'aws' ? 'AWS' : prov === 'gcp' ? 'Google Cloud' : 'Azure'}._`, '')
-  const ch = CHALLENGES.find((c) => c.id === s.challengeId)
+  const ch = findChallenge(s.challengeId)
   if (ch) L.push(`**Problem:** ${ch.title}. ${ch.brief}`, '')
 
   const iv = s.interview

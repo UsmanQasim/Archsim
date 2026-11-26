@@ -84,3 +84,68 @@ const url = 'https://archsim-pi.vercel.app/#g=' + compressToEncodedURIComponent(
 ```
 
 Unknown kinds, edges to missing nodes and unknown challenge ids are dropped on import rather than failing.
+
+## Challenges
+
+A challenge is a problem, its targets, its design checks and a reference solution in steps, all in one JSON document. The in-app editor (*Problems → Create a challenge*) writes it for you from boards you capture, and *Download JSON* saves it. Every problem in [`src/sim/problems.ts`](../src/sim/problems.ts) is written this way.
+
+```jsonc
+{
+  "v": 1,
+  "id": "team-wiki",
+  "title": "Team Wiki",
+  "difficulty": "Medium",                  // Easy, Medium or Hard
+  "topic": "Caching",
+  "tags": ["read-heavy"],
+  "brief": "50k employees read pages all day; edits are rare.",
+  "hints": ["Most reads are the same 1,000 pages."],
+  "author": "Priya",                       // shown to candidates
+  "targets": { "p99": 200, "availability": 0.999, "budget": 7000 },  // backlogSec is optional
+  "checks": [
+    { "type": "noDirect", "from": ["client"], "to": ["app"], "label": "Servers sit behind a load balancer" },
+    { "type": "path", "from": ["client"], "to": ["cache"] },
+    { "type": "resilient", "kinds": ["sql"] }
+  ],
+  "steps": [
+    { "title": "One server and a database", "why": "Start simple." },
+    { "title": "Add a cache", "why": "Reads are 99% of traffic." }
+  ],
+  "nodes": [
+    { "key": "u", "kind": "client", "col": 0, "row": 1, "config": { "users": 50000, "reqPerUserMin": 2, "readRatio": 0.95 } },
+    { "key": "lb", "kind": "lb", "col": 1, "row": 1, "from": 0 },
+    { "key": "app", "kind": "app", "col": 2, "row": 1, "from": 0, "at": { "1": { "instances": 4 } } },
+    { "key": "c", "kind": "cache", "col": 3, "row": 0, "from": 1 },
+    { "key": "db", "kind": "sql", "col": 3, "row": 2, "from": 0, "at": { "1": { "multiAz": true } } }
+  ],
+  "edges": [
+    { "a": "u", "b": "lb", "from": 0 },
+    { "a": "lb", "b": "app", "from": 0 },
+    { "a": "app", "b": "db", "from": 0 },
+    { "a": "app", "b": "c", "from": 1, "filter": "read" }
+  ]
+}
+```
+
+**Steps.** Step `-1` is the board the candidate starts from, usually just the users. A node or edge appears from step `from` (default `0`, or `-1` for `client`) and disappears at step `until`. `at` patches a node's `config` from a given step on. `col` and `row` are grid positions, 235 by 150 pixels.
+
+**Checks.**
+
+| `type` | Fields | Passes when |
+|---|---|---|
+| `has` | `kinds`, `min?` | At least `min` (default 1) of these kinds are on the board. |
+| `lacks` | `kinds` | None of these kinds are on the board. |
+| `path` | `from`, `to`, `via?` | Traffic can flow from one of `from` to one of `to`, optionally through `via`. |
+| `decoupled` | `from`, `to` | `from` reaches `to` only through a queue or stream. |
+| `noDirect` | `from`, `to` | No edge goes straight from `from` to `to`. |
+| `resilient` | `kinds` | Every node of these kinds survives losing a zone (Multi-AZ, replicas, or two or more instances). |
+| `autoscale` | `kinds?` | The stateless tier autoscales. |
+| `regions` | `min` | Parts run in at least `min` regions. |
+| `config` | `kinds`, `field`, `op`, `value` | Every node of these kinds has a setting that compares as given (`>=`, `<=`, `==`). |
+
+Every check takes an optional `label` and `why`; without them ArchSim writes its own.
+
+## Challenge links and result links
+
+A challenge link is `https://archsim-pi.vercel.app/#c=` followed by the challenge JSON compressed with lz-string, the same way as a design. Opening it adds the challenge to the candidate's problem list and starts it.
+
+When the candidate presses *Send to interviewer*, ArchSim runs the 24-hour test and makes a result link, `#r=`, holding their design, the report against the targets and checks, their practice notes and how long they took. For a custom challenge the result also carries the challenge itself, so the interviewer can open it on any machine. Nothing is uploaded anywhere: the whole thing lives in the link.

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { fmtMoney, fmtMs, fmtNum, fmtPct } from '../format'
 import { measure, useApp } from '../store'
 import { growthPlan, type GrowthReport } from '../sim/analysis'
-import { CHALLENGES } from '../sim/scenarios'
+import { findChallenge } from '../sim/scenarios'
 
 // ---------------------------------------------------------------- breaking point
 export function LimitPanel() {
@@ -95,7 +95,7 @@ export function GrowthPanel() {
   const nodes = useApp((s) => s.nodes)
   const select = useApp((s) => s.select)
   const challengeId = useApp((s) => s.challengeId)
-  const ch = CHALLENGES.find((c) => c.id === challengeId)
+  const ch = findChallenge(challengeId)
   const [growth, setGrowth] = useState(15)
   const [budget, setBudget] = useState<string>(() => (ch ? String(ch.targets.budget) : ''))
   const [report, setReport] = useState<GrowthReport | null>(null)
@@ -105,7 +105,7 @@ export function GrowthPanel() {
     setTimeout(() => {
       const s = useApp.getState()
       const b = Number(budget)
-      const c = CHALLENGES.find((x) => x.id === s.challengeId)
+      const c = findChallenge(s.challengeId)
       setReport(growthPlan(s.nodes, s.edges, s.chaos, growth / 100, budget.trim() && b > 0 ? b : null, c ? { p99: c.targets.p99, availability: c.targets.availability } : undefined))
       setRunning(false)
     }, 30)

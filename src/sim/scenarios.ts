@@ -140,4 +140,4 @@ export const TEMPLATES: Template[] = [
   },
 ]
 
-export { CHALLENGES, TOPICS, type Challenge, type DesignCheck } from './challenges'
+export { CHALLENGES, TOPICS, allChallenges, customChallenges, findChallenge, setCustomChallenges, type Challenge, type DesignCheck } from './challenges'

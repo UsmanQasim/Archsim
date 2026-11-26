@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CHALLENGES } from '../sim/scenarios'
+import { allChallenges, findChallenge } from '../sim/scenarios'
 import { PHASES, fmtTimer, phaseWindows } from '../practice'
 import { fmtMoney, fmtMs, fmtPct } from '../format'
 import { useApp, useSim } from '../store'
@@ -46,9 +46,9 @@ function PracticeStart() {
   const startChallenge = useApp((s) => s.startChallenge)
   const startInterview = useApp((s) => s.startInterview)
   const nodes = useApp((s) => s.nodes)
-  const [q, setQ] = useState<string>(challengeId ?? CHALLENGES[0].id)
+  const [q, setQ] = useState<string>(challengeId ?? allChallenges()[0].id)
   const [minutes, setMinutes] = useState(45)
-  const ch = CHALLENGES.find((c) => c.id === q)
+  const ch = findChallenge(q)
   const start = () => {
     if (q !== 'board' && q !== challengeId) startChallenge(q)
     startInterview(minutes)
@@ -62,7 +62,7 @@ function PracticeStart() {
             <span>Question</span>
             <select value={q} onChange={(e) => setQ(e.target.value)}>
               <option value="board">Whatever is on the board{nodes.length ? '' : ' (empty)'}</option>
-              {CHALLENGES.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+              {allChallenges().map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
             </select>
           </label>
           <label className="field">
@@ -102,7 +102,7 @@ function PracticeLive() {
   const shownId = picked ?? wins[current].id
   const shown = PHASES.find((p) => p.id === shownId)!
   const left = iv.minutes * 60 - elapsed
-  const ch = CHALLENGES.find((c) => c.id === iv.challengeId)
+  const ch = findChallenge(iv.challengeId)
   const goto: Record<string, (() => void) | undefined> = {
     estimates: () => setTab('estimate'),
     bottlenecks: () => setTab('tests'),
@@ -163,7 +163,7 @@ function PracticeSummary() {
   const nodes = useApp((s) => s.nodes)
   const res = useSim((s) => s.result)
   const taken = ((iv.finishedAt ?? Date.now()) - iv.startedAt) / 1000
-  const ch = CHALLENGES.find((c) => c.id === iv.challengeId)
+  const ch = findChallenge(iv.challengeId)
   const covered = PHASES.filter((p) => iv.notes[p.id]?.trim())
   const T = res?.totals
   const checks: { label: string; ok: boolean }[] = []

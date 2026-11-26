@@ -1,6 +1,6 @@
 # ArchSim
 
-> A free, client-only system design simulator. Build an architecture from 29 cloud components, then watch traffic, latency, failures and monthly cost react live. Includes 18 interview problems with reference solutions.
+> A free, client-only system design simulator. Build an architecture from 29 cloud components, then watch traffic, latency, failures and monthly cost react live. Includes 52 interview problems with reference solutions, eight short lessons, and a challenge editor that shares problems and results as links.
 
 ArchSim runs entirely in the browser. A design is a JSON document; a share link is that JSON compressed with lz-string after `#g=`.
 

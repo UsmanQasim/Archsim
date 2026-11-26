@@ -17,5 +17,5 @@ test('phone: panels slide in and the menu holds the hidden controls', async ({ p
   await expect(page.locator('.inspector')).toBeInViewport()
   await page.getByRole('button', { name: 'Close details' }).click()
   await page.getByRole('button', { name: 'More' }).click()
-  await expect(page.getByRole('button', { name: 'Challenges' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Problems/ })).toBeVisible()
 })

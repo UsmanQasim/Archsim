@@ -8,6 +8,8 @@ import { CATALOG, defaultConfig } from './catalog'
 import { DEFAULT_EDGE } from './engine'
 import type { Graph } from './scenarios'
 import type { GraphEdge, GraphNode, NodeConfig, NodeKind, Pattern, SimEdgeData } from './types'
+import { compileSpec } from './spec'
+import { EXTRA_PROBLEMS } from './problems'
 
 export interface DesignCheck {
   label: string
@@ -33,6 +35,10 @@ export interface Challenge {
   steps: SolutionStep[]
   /** step -1 → users only; 0..steps.length-1 → reference architecture after that step */
   build: (step: number) => Graph
+  tags?: string[]
+  author?: string
+  /** set for challenges defined as data (extra problems, editor-made, from links) */
+  spec?: import('./spec').ChallengeSpec
 }
 
 // ------------------------------------------------------------------ staged builder
@@ -958,4 +964,17 @@ export const CHALLENGES: Challenge[] = [
   },
 ]
 
+CHALLENGES.push(...EXTRA_PROBLEMS.map(compileSpec))
+
 export const TOPICS = [...new Set(CHALLENGES.map((c) => c.topic))]
+
+// ------------------------------------------------------------------ registry
+/** Challenges made in the editor or opened from a link, kept in this browser. */
+let custom: Challenge[] = []
+
+export function setCustomChallenges(specs: import('./spec').ChallengeSpec[]) {
+  custom = specs.map((s) => ({ ...compileSpec(s), author: s.author ?? 'You' }))
+}
+export const customChallenges = () => custom
+export const allChallenges = () => [...CHALLENGES, ...custom]
+export const findChallenge = (id: string | null | undefined) => (id ? CHALLENGES.find((c) => c.id === id) ?? custom.find((c) => c.id === id) : undefined)

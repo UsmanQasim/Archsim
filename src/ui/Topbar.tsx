@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { TEMPLATES, CHALLENGES } from '../sim/scenarios'
+import { TEMPLATES, allChallenges } from '../sim/scenarios'
 import { patternFactor } from '../sim/engine'
 import { PROVIDERS } from '../sim/catalog'
 import { copyDesignDoc, downloadDesignDoc } from '../doc'
@@ -85,14 +85,14 @@ export function Topbar() {
   const canUndo = useApp((s) => s.past.length > 0)
   const canRedo = useApp((s) => s.future.length > 0)
   const loadTemplate = useApp((s) => s.loadTemplate)
-  const startChallenge = useApp((s) => s.startChallenge)
+  const openBank = useApp((s) => s.openBank)
+  useApp((s) => s.customVersion)
   const shareLink = useApp((s) => s.shareLink)
   const exportJson = useApp((s) => s.exportJson)
   const importJson = useApp((s) => s.importJson)
   const setHelp = useApp((s) => s.setHelp)
   const provider = useApp((s) => s.provider)
   const setProvider = useApp((s) => s.setProvider)
-  const startGuide = useApp((s) => s.startGuide)
   const passed = useApp((s) => s.passed)
   const theme = useApp((s) => s.theme)
   const toggleTheme = useApp((s) => s.toggleTheme)
@@ -132,20 +132,10 @@ export function Topbar() {
           </button>
         ))}
       </Menu>
-      <Menu label="Challenges" wide className="hide-narrow">
-        {(close) => [
-          <div key="_progress" className="menu-progress small">{CHALLENGES.filter((c) => passed[c.id]).length} of {CHALLENGES.length} passed</div>,
-          ...CHALLENGES.map((c) => (
-          <div key={c.id} className="menu-row">
-            <button className="menu-item" onClick={() => { startChallenge(c.id); close() }}>
-              <b>{c.title} <em className={`diff d-${c.difficulty}`}>{c.difficulty}</em>{passed[c.id] && <em className="passed-tag">passed</em>}</b>
-              <span>{c.brief}</span>
-            </button>
-            <button className="tbtn small" title="Walk through a reference solution step by step" onClick={() => { startGuide(c.id); close() }}>See solution</button>
-          </div>
-        )),
-        ]}
-      </Menu>
+      <button className="tbtn hide-narrow" onClick={() => openBank('problems')} title="Interview problems, lessons, and your own challenges">
+        Problems <span className="tb-count">{allChallenges().filter((c) => passed[c.id]).length}/{allChallenges().length}</span>
+      </button>
+      <button className="tbtn hide-narrow hide-mid" onClick={() => openBank('learn')}>Learn</button>
 
       <div className="seg view-seg" role="group" aria-label="View">
         {(['2d', 'split', '3d', 'map'] as View[]).map((v) => (
@@ -231,7 +221,7 @@ export function Topbar() {
 
 /** Phone menu: everything the top bar hides on small screens, one level deep. */
 function MoreMenu({ onImport }: { onImport: () => void }) {
-  const [sub, setSub] = useState<'root' | 'templates' | 'challenges' | 'file'>('root')
+  const [sub, setSub] = useState<'root' | 'templates' | 'file'>('root')
   const s = useApp()
   const back = <button className="menu-back" onClick={() => setSub('root')}><Chevron /> Back</button>
   return (
@@ -239,12 +229,6 @@ function MoreMenu({ onImport }: { onImport: () => void }) {
       {(close) => {
         const done = () => { setSub('root'); close() }
         if (sub === 'templates') return <>{back}{TEMPLATES.map((t) => <button key={t.id} className="menu-item" onClick={() => { s.loadTemplate(t.id); done() }}><b>{t.title}</b><span>{t.blurb}</span></button>)}</>
-        if (sub === 'challenges') return <>{back}{CHALLENGES.map((c) => (
-          <div key={c.id} className="menu-row">
-            <button className="menu-item" onClick={() => { s.startChallenge(c.id); done() }}><b>{c.title} <em className={`diff d-${c.difficulty}`}>{c.difficulty}</em>{s.passed[c.id] && <em className="passed-tag">passed</em>}</b></button>
-            <button className="tbtn small" onClick={() => { s.startGuide(c.id); done() }}>Solution</button>
-          </div>
-        ))}</>
         if (sub === 'file') return <>{back}
           <button className="menu-item" onClick={() => { s.shareLink(); done() }}><b>Copy share link</b></button>
           <button className="menu-item" onClick={() => { downloadDesignDoc(); done() }}><b>Download design doc</b></button>
@@ -255,7 +239,9 @@ function MoreMenu({ onImport }: { onImport: () => void }) {
         return (
           <>
             <button className="menu-item nav" onClick={() => setSub('templates')}><b>Templates</b></button>
-            <button className="menu-item nav" onClick={() => setSub('challenges')}><b>Challenges</b><span>{CHALLENGES.filter((c) => s.passed[c.id]).length} of {CHALLENGES.length} passed</span></button>
+            <button className="menu-item" onClick={() => { s.openBank('problems'); done() }}><b>Problems</b><span>{allChallenges().filter((c) => s.passed[c.id]).length} of {allChallenges().length} solved</span></button>
+            <button className="menu-item" onClick={() => { s.openBank('learn'); done() }}><b>Learn</b><span>Short lessons with a live task each</span></button>
+            <button className="menu-item" onClick={() => { s.openBank('create'); done() }}><b>Create a challenge</b><span>For interviewers: share a problem as a link</span></button>
             <button className="menu-item nav" onClick={() => setSub('file')}><b>File</b><span>Share, export, import</span></button>
             <div className="menu-sep" />
             <div className="menu-inline">
@@ -335,7 +321,9 @@ export function HelpModal() {
           <li><b>Watch.</b> The clock runs through a day. Traffic rises and falls, autoscaling reacts, queues fill and drain. The Model view shows it as a 3D table model.</li>
           <li><b>Break it.</b> In the Chaos tab, take components down, lose a zone or a whole region, cut links, add delay, multiply traffic, or empty every cache. Turn on retries for a connection to see a retry storm, then add a circuit breaker to stop it.</li>
           <li><b>Improve.</b> The Advisor points out single points of failure, overloaded parts, slow cross-region calls and retry storms. The Cost tab finds reserved, spot and ARM savings. Most come with a one-click fix.</li>
-          <li><b>Practise.</b> {CHALLENGES.length} classic interview problems, from a URL shortener to Uber, Ticketmaster, payments, IoT telemetry, collaborative apps, and an LLM assistant. Try them yourself, or open <i>See the solution</i> to walk through how a good design comes together, one step at a time.</li>
+          <li><b>Practise.</b> {allChallenges().length} interview problems, from a pastebin to a ledger, Uber and an LLM assistant, with filters by topic and difficulty under <i>Problems</i>. Try them yourself, or open <i>Solution</i> to walk through how a good design comes together, one step at a time.</li>
+          <li><b>Learn.</b> Eight short lessons, one idea each (latency, scaling, caching, replication, queues, sharding, CDNs, retries), each with a live task on the board.</li>
+          <li><b>Interview.</b> Interviewers build a challenge from their own board under <i>Problems → Create a challenge</i> and send it as a link. Candidates solve it and press <i>Send to interviewer</i> for a result link with their design, scores and notes. Nothing is uploaded.</li>
           <li><b>Pick your cloud.</b> Switch AWS / Google Cloud / Azure in the top bar to see the matching product names.</li>
         </ol>
         <h2 className="subh">Shortcuts</h2>

@@ -8,6 +8,7 @@ import { FlowCanvas } from './ui/FlowCanvas'
 import { Inspector } from './ui/Inspector'
 import { Dock, MetricsStrip } from './ui/Dock'
 import { QuickAdd } from './ui/QuickAdd'
+import { ProblemBank, ResultView, SubmitDialog } from './ui/Bank'
 import { getLayout, useDrawer, useLayout } from './layout'
 
 // the 3D model (three.js) and the world map are loaded only when first shown
@@ -252,6 +253,9 @@ export default function App() {
           <Dock />
         </div>
         <HelpModal />
+        <ProblemBank />
+        <SubmitDialog />
+        <ResultView />
         <QuickAdd />
         <div className="toast-region" role="status" aria-live="polite" aria-atomic="true">
           {toast && <div className="toast">{toast}</div>}

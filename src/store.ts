@@ -8,7 +8,10 @@ import type { Advice, Fix } from './sim/advisor'
 import { CATALOG, defaultConfig } from './sim/catalog'
 import { DEFAULT_EDGE, runDay, type DayReport } from './sim/engine'
 import { findLimit, steadyState, type LimitReport } from './sim/analysis'
-import { CHALLENGES, TEMPLATES, uid, type Graph } from './sim/scenarios'
+import { TEMPLATES, findChallenge, setCustomChallenges, uid, type Graph } from './sim/scenarios'
+import { parseSpec, type ChallengeSpec } from './sim/spec'
+import { LESSONS } from './learn'
+import type { ResultPayload } from './share'
 import {
   emptyChaos, emptyRuntime, type Chaos, type NodeConfig, type NodeKind, type Provider, type Runtime, type SimEdgeData, type SimNodeData, type SimResult,
 } from './sim/types'
@@ -22,7 +25,8 @@ export type NNode = Node<{ text: string; color: NoteColor; [k: string]: unknown 
 export interface PassRecord { at: number; cost: number; p99: number }
 export interface Interview { startedAt: number; minutes: number; notes: Record<string, string>; finishedAt: number | null; challengeId?: string | null }
 export type Selection = { type: 'node' | 'edge'; id: string } | null
-export type DockTab = 'advisor' | 'cost' | 'chaos' | 'tests' | 'compare' | 'estimate' | 'challenge' | 'practice'
+export type DockTab = 'advisor' | 'cost' | 'chaos' | 'tests' | 'compare' | 'estimate' | 'challenge' | 'practice' | 'learn'
+export type BankTab = 'problems' | 'learn' | 'create'
 export interface VariantMetrics { rps: number; p99: number; avgLatency: number; availability: number; cost: number; bottleneck: string; nodes: number }
 export interface Variant { id: string; name: string; savedAt: number; nodes: SNode[]; edges: SEdge[]; metrics: VariantMetrics }
 export interface Guide { challengeId: string; step: number }
@@ -98,6 +102,22 @@ interface AppState {
   toggleInspector: () => void
   toggleDock: () => void
   triggerFit: () => void
+  /** bumps when the set of custom challenges changes, so lists re-render */
+  customVersion: number
+  bank: { open: boolean; tab: BankTab; lesson?: string | null }
+  openBank: (tab?: BankTab) => void
+  closeBank: () => void
+  addCustomChallenge: (spec: ChallengeSpec, start?: boolean) => void
+  removeCustomChallenge: (id: string) => void
+  /** a candidate's submitted result, opened from a result link */
+  resultView: ResultPayload | null
+  setResultView: (r: ResultPayload | null) => void
+  submitOpen: boolean
+  setSubmitOpen: (o: boolean) => void
+  lesson: { id: string; step: number } | null
+  startLesson: (id: string) => void
+  lessonTo: (step: number) => void
+  exitLesson: () => void
   removeNote: (id: string) => void
 
   onNodesChange: (c: NodeChange<SNode>[]) => void
@@ -192,9 +212,49 @@ function avgPos(ns: SNode[]) {
   return { x: ns.reduce((s, n) => s + n.position.x, 0) / ns.length, y: ns.reduce((s, n) => s + n.position.y, 0) / ns.length }
 }
 
+setCustomChallenges(loadJSON<ChallengeSpec[]>('archsim:custom', []))
+
 export const useApp = create<AppState>((set, get) => ({
   title: 'Untitled system',
   saveStatus: 'saved',
+  customVersion: 0,
+  bank: { open: false, tab: 'problems' },
+  openBank: (tab) => set((s) => ({ bank: { open: true, tab: tab ?? s.bank.tab } })),
+  closeBank: () => set((s) => ({ bank: { ...s.bank, open: false } })),
+  addCustomChallenge: (spec, start) => {
+    const list = [...loadJSON<ChallengeSpec[]>('archsim:custom', []).filter((x) => x.id !== spec.id), spec]
+    saveJSON('archsim:custom', list)
+    setCustomChallenges(list)
+    set((s) => ({ customVersion: s.customVersion + 1 }))
+    if (start) get().startChallenge(spec.id)
+  },
+  removeCustomChallenge: (id) => {
+    const list = loadJSON<ChallengeSpec[]>('archsim:custom', []).filter((x) => x.id !== id)
+    saveJSON('archsim:custom', list)
+    setCustomChallenges(list)
+    set((s) => ({ customVersion: s.customVersion + 1 }))
+  },
+  resultView: null,
+  setResultView: (r) => set({ resultView: r }),
+  submitOpen: false,
+  setSubmitOpen: (o) => set({ submitOpen: o }),
+  lesson: null,
+  startLesson: (id) => {
+    const l = LESSONS.find((x) => x.id === id)
+    if (!l) return
+    get().loadGraph(l.steps[0].board!(), { title: `Lesson: ${l.title}` })
+    set((s) => ({ lesson: { id, step: 0 }, bank: { ...s.bank, open: false }, dockTab: 'learn', view: '2d', playing: true }))
+  },
+  lessonTo: (step) => {
+    const cur = get().lesson
+    const l = cur && LESSONS.find((x) => x.id === cur.id)
+    if (!cur || !l) return
+    const st = Math.max(0, Math.min(l.steps.length - 1, step))
+    const b = l.steps[st].board
+    if (b && st !== cur.step) get().loadGraph(b(), { title: `Lesson: ${l.title}`, keepDock: true })
+    set({ lesson: { id: cur.id, step: st }, dockTab: 'learn' })
+  },
+  exitLesson: () => set({ lesson: null, dockTab: 'advisor' }),
   nodes: [],
   edges: [],
   selection: null,
@@ -412,18 +472,18 @@ export const useApp = create<AppState>((set, get) => ({
     if (t) get().loadGraph(t.build(), { title: t.title.replace(/^\d+ · /, '') })
   },
   startChallenge: (id) => {
-    const c = CHALLENGES.find((x) => x.id === id)
+    const c = findChallenge(id)
     if (c) get().loadGraph(c.build(-1), { title: `Challenge: ${c.title}`, challengeId: id })
   },
   startGuide: (challengeId) => {
-    const c = CHALLENGES.find((x) => x.id === challengeId)
+    const c = findChallenge(challengeId)
     if (!c) return
     get().loadGraph(c.build(0), { title: `Solution: ${c.title}`, challengeId })
     set({ guide: { challengeId, step: 0 }, dockTab: 'challenge', playing: true })
   },
   guideTo: (step) => {
     const g = get().guide
-    const c = g && CHALLENGES.find((x) => x.id === g.challengeId)
+    const c = g && findChallenge(g.challengeId)
     if (!g || !c) return
     const st = Math.max(0, Math.min(c.steps.length - 1, step))
     const keepTime = get().time
@@ -533,7 +593,7 @@ export const useApp = create<AppState>((set, get) => ({
       const report = runDay(s.nodes, s.edges, s.chaos, 60)
       set({ dayReport: report, dayRunning: false })
       // remember challenges solved by your own design (not by watching the solution)
-      const ch = CHALLENGES.find((c) => c.id === s.challengeId)
+      const ch = findChallenge(s.challengeId)
       if (ch && !s.guide) {
         const t = ch.targets
         const ok = report.dayP99 <= t.p99 && report.dayAvailability >= t.availability && report.avgMonthlyCost <= t.budget && (!t.backlogSec || report.maxBacklogSec <= t.backlogSec) && ch.checks.every((k) => k.test({ nodes: s.nodes, edges: s.edges }))
@@ -744,7 +804,7 @@ function persistVariants(v: Variant[]) {
 }
 
 // ---------------- persistence ----------------
-interface Saved {
+export interface Saved {
   v: 1
   title: string
   challengeId: string | null
@@ -753,7 +813,7 @@ interface Saved {
   notes?: { id: string; p: [number, number]; w?: number; h?: number; text: string; color: NoteColor }[]
 }
 
-function serialize(s: { title: string; challengeId: string | null; nodes: SNode[]; edges: SEdge[]; notes?: NNode[] }): Saved {
+export function serialize(s: { title: string; challengeId: string | null; nodes: SNode[]; edges: SEdge[]; notes?: NNode[] }): Saved {
   return {
     v: 1,
     title: s.title,
@@ -765,7 +825,7 @@ function serialize(s: { title: string; challengeId: string | null; nodes: SNode[
 }
 
 const NOTE_COLORS: NoteColor[] = ['yellow', 'pink', 'blue', 'green']
-function deserialize(raw: unknown): { title: string; challengeId: string | null; graph: Graph; notes: NNode[] } {
+export function deserialize(raw: unknown): { title: string; challengeId: string | null; graph: Graph; notes: NNode[] } {
   const o = raw as Saved
   if (!o || o.v !== 1 || !Array.isArray(o.nodes) || !Array.isArray(o.edges)) throw new Error('bad')
   const nodes = o.nodes
@@ -778,7 +838,7 @@ function deserialize(raw: unknown): { title: string; challengeId: string | null;
   const edges = o.edges
     .filter((e) => ids.has(e.s) && ids.has(e.t))
     .map((e) => ({ id: String(e.id), source: e.s, target: e.t, type: 'sim', data: { ...DEFAULT_EDGE, ...(e.d ?? {}) } }))
-  const challengeId = o.challengeId && CHALLENGES.some((c) => c.id === o.challengeId) ? o.challengeId : null
+  const challengeId = o.challengeId && findChallenge(o.challengeId) ? o.challengeId : null
   const notes: NNode[] = (Array.isArray(o.notes) ? o.notes : []).slice(0, 100).map((n) => ({
     id: String(n.id).startsWith('note-') ? String(n.id) : `note-${String(n.id)}`, type: 'note' as const,
     position: { x: Number(n.p?.[0]) || 0, y: Number(n.p?.[1]) || 0 },
@@ -792,6 +852,31 @@ const LS_KEY = 'archsim:v1'
 
 export function initFromUrlOrStorage() {
   const st = useApp.getState()
+  const c = location.hash.match(/#c=(.+)$/)
+  if (c) {
+    try {
+      const spec = parseSpec(JSON.parse(decompressFromEncodedURIComponent(c[1]) ?? ''))
+      st.addCustomChallenge(spec, true)
+      useApp.setState({ past: [], dockTab: 'challenge' })
+      st.showToast(`Challenge loaded: ${spec.title}`)
+      return
+    } catch {
+      st.showToast('That challenge link is damaged or incomplete.')
+    }
+  }
+  const r = location.hash.match(/#r=(.+)$/)
+  if (r) {
+    try {
+      const res = JSON.parse(decompressFromEncodedURIComponent(r[1]) ?? '') as ResultPayload
+      if (res.spec) st.addCustomChallenge(parseSpec(res.spec))
+      const g = deserialize(res.design)
+      st.loadGraph(g.graph, { title: `${res.candidate ? `${res.candidate}: ` : ''}${res.title}`, challengeId: g.challengeId, notes: g.notes })
+      useApp.setState({ past: [], resultView: res, playing: false })
+      return
+    } catch {
+      st.showToast('That result link is damaged or incomplete.')
+    }
+  }
   const m = location.hash.match(/#g=(.+)$/)
   if (m) {
     try {

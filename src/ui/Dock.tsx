@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { Advice } from '../sim/advisor'
-import { CHALLENGES, TOPICS } from '../sim/scenarios'
+import { allChallenges, findChallenge } from '../sim/scenarios'
+import { LessonPanel } from './Bank'
+import { LESSONS } from '../learn'
 import { CATALOG, type Category } from '../sim/catalog'
 import { ComparePanel, EstimatePanel, GrowthPanel, LimitPanel } from './Panels'
 import { PracticePanel } from './Practice'
@@ -86,11 +88,14 @@ export function Dock() {
   const guide = useApp((s) => s.guide)
   const variantCount = useApp((s) => s.variants.length)
   const interview = useApp((s) => s.interview)
+  const lesson = useApp((s) => s.lesson)
+  const lessonInfo = lesson ? `${lesson.step + 1}/${LESSONS.find((l) => l.id === lesson.id)?.steps.length ?? 0}` : undefined
   const tabs: { id: DockTab; label: string; badge?: string | number; tone?: string }[] = [
     { id: 'advisor', label: 'Advisor', badge: general.length || undefined, tone: crit ? 'bad' : 'muted' },
     { id: 'cost', label: 'Cost', badge: saving > 1 ? `save ${fmtMoney(saving)}` : undefined, tone: 'good' },
     { id: 'chaos', label: 'Chaos', badge: chaosCount || undefined, tone: 'bad' },
     { id: 'challenge', label: guide ? 'Solution' : challengeId ? 'Challenge' : 'Challenges', badge: guide ? `step ${guide.step + 1}` : challengeId ? 'active' : undefined, tone: 'live' },
+    { id: 'learn', label: lesson ? 'Lesson' : 'Learn', badge: lessonInfo, tone: 'live' },
     { id: 'tests', label: 'Stress tests' },
     { id: 'compare', label: 'Compare', badge: variantCount || undefined, tone: 'muted' },
     { id: 'estimate', label: 'Estimate' },
@@ -140,6 +145,7 @@ export function Dock() {
           {tab === 'cost' && <CostPanel />}
           {tab === 'chaos' && <ChaosPanel />}
           {tab === 'challenge' && <ChallengePanel />}
+          {tab === 'learn' && <LessonPanel />}
           {tab === 'tests' && <TestsPanel />}
           {tab === 'compare' && <ComparePanel />}
           {tab === 'estimate' && <EstimatePanel />}
@@ -324,7 +330,7 @@ function ChaosPanel() {
 function ChallengePanel() {
   const challengeId = useApp((s) => s.challengeId)
   const guide = useApp((s) => s.guide)
-  const ch = CHALLENGES.find((c) => c.id === challengeId)
+  const ch = findChallenge(challengeId)
   if (!ch) return <ChallengeList />
   return guide ? <GuidePanel /> : <ActiveChallenge key={ch.id} />
 }
@@ -332,28 +338,32 @@ function ChallengePanel() {
 function ChallengeList() {
   const startChallenge = useApp((s) => s.startChallenge)
   const startGuide = useApp((s) => s.startGuide)
+  const openBank = useApp((s) => s.openBank)
   const passed = useApp((s) => s.passed)
-  const [topic, setTopic] = useState<string>('All')
-  const list = CHALLENGES.filter((c) => topic === 'All' || c.topic === topic)
-  const done = CHALLENGES.filter((c) => passed[c.id]).length
+  useApp((s) => s.customVersion)
+  const all = allChallenges()
+  const done = all.filter((c) => passed[c.id]).length
+  // suggest the next few unsolved problems, easiest first
+  const order = { Easy: 0, Medium: 1, Hard: 2 } as const
+  const next = all.filter((c) => !passed[c.id]).sort((a, b) => order[a.difficulty] - order[b.difficulty]).slice(0, 6)
   return (
     <div>
       <div className="progress-row">
-        <div className="progress-bar" role="progressbar" aria-valuemin={0} aria-valuemax={CHALLENGES.length} aria-valuenow={done} aria-label="Challenges passed">
-          <span style={{ width: `${(done / CHALLENGES.length) * 100}%` }} />
+        <div className="progress-bar" role="progressbar" aria-valuemin={0} aria-valuemax={all.length} aria-valuenow={done} aria-label="Problems solved">
+          <span style={{ width: `${(done / all.length) * 100}%` }} />
         </div>
-        <span className="small">{done ? `${done} of ${CHALLENGES.length} passed` : `None passed yet. Pass one by meeting its targets in the 24-hour test.`}</span>
+        <span className="small">{done ? `${done} of ${all.length} solved` : `${all.length} problems. Solve one by meeting its targets in the 24-hour test.`}</span>
+        <div className="btnrow">
+          <button className="btn small btn-accent" onClick={() => openBank('problems')}>All problems</button>
+          <button className="btn small" onClick={() => openBank('learn')}>Lessons</button>
+          <button className="btn small" onClick={() => openBank('create')}>Create a challenge</button>
+        </div>
       </div>
-      <div className="chips topic-chips">
-        {['All', ...TOPICS].map((t) => (
-          <button key={t} className={`chip ${topic === t ? 'on-accent' : ''}`} onClick={() => setTopic(t)}>{t}</button>
-        ))}
-      </div>
+      <h4 className="small muted">Up next</h4>
       <div className="challenge-grid">
-        {list.map((c) => (
-          <div key={c.id} className={`ch-card ${passed[c.id] ? 'passed' : ''}`}>
+        {next.map((c) => (
+          <div key={c.id} className="ch-card">
             <div className="ch-top"><b>{c.title}</b><span className={`diff d-${c.difficulty}`}>{c.difficulty}</span></div>
-            {passed[c.id] && <div className="passed-note small">Passed {new Date(passed[c.id].at).toLocaleDateString()} at {fmtMoney(passed[c.id].cost)} a month, p99 {fmtMs(passed[c.id].p99)}</div>}
             <div className="muted small">{c.brief}</div>
             <div className="concepts">{c.concepts.slice(0, 4).map((k) => <span key={k}>{k}</span>)}</div>
             <div className="ch-targets small">p99 under {c.targets.p99} ms, {fmtPct(c.targets.availability, 2)} up, under {fmtMoney(c.targets.budget)} a month</div>
@@ -373,14 +383,15 @@ function Targets() {
   const report = useApp((s) => s.dayReport)
   const running = useApp((s) => s.dayRunning)
   const runDayTest = useApp((s) => s.runDayTest)
+  const setSubmitOpen = useApp((s) => s.setSubmitOpen)
   const nodes = useApp((s) => s.nodes)
   const edges = useApp((s) => s.edges)
   const res = useSim((s) => s.result)
-  const ch = CHALLENGES.find((c) => c.id === challengeId)!
+  const ch = findChallenge(challengeId)!
   const T = res?.totals
   const has = T && T.offered > 0
   const rows = [
-    { k: 'p99 latency', target: `≤ ${ch.targets.p99} ms`, now: T ? fmtMs(T.p99) : '—', ok: has && T!.p99 <= ch.targets.p99, day: report ? fmtMs(report.dayP99) : null, dayOk: report ? report.dayP99 <= ch.targets.p99 : null },
+    { k: 'p99 latency', target: `≤ ${ch.targets.p99} ms`, now: T ? fmtMs(T.p99) : '—', ok: has && T!.availability > 0 && T!.p99 <= ch.targets.p99, day: report ? fmtMs(report.dayP99) : null, dayOk: report ? report.dayAvailability > 0 && report.dayP99 <= ch.targets.p99 : null },
     { k: 'Availability', target: `≥ ${fmtPct(ch.targets.availability, 2)}`, now: T ? fmtPct(T.availability, 2) : '—', ok: has && T!.availability >= ch.targets.availability, day: report ? fmtPct(report.dayAvailability, 3) : null, dayOk: report ? report.dayAvailability >= ch.targets.availability : null },
     { k: 'Monthly cost', target: `≤ ${fmtMoney(ch.targets.budget)}`, now: T ? fmtMoney(T.monthlyCost) : '—', ok: has && T!.monthlyCost <= ch.targets.budget, day: report ? fmtMoney(report.avgMonthlyCost) : null, dayOk: report ? report.avgMonthlyCost <= ch.targets.budget : null },
   ]
@@ -413,6 +424,7 @@ function Targets() {
       </ul>
       <div className="btnrow">
         <button className="btn btn-accent" onClick={runDayTest} disabled={running}>{running ? 'Running a simulated day…' : 'Run the 24-hour test'}</button>
+        <button className="btn" onClick={() => setSubmitOpen(true)} title="Make a link with your design, notes and scores">Send to interviewer</button>
         {report && <span className={`verdict ${passed ? 'ok' : 'bad'}`}>{passed ? 'Passed' : 'Not passing yet. Fix the rows marked ✗.'}</span>}
       </div>
     </div>
@@ -424,7 +436,7 @@ function ActiveChallenge() {
   const loadTemplate = useApp((s) => s.loadTemplate)
   const startGuide = useApp((s) => s.startGuide)
   const [hints, setHints] = useState(0)
-  const ch = CHALLENGES.find((c) => c.id === challengeId)!
+  const ch = findChallenge(challengeId)!
   return (
     <div className="challenge">
       <div className="ch-brief">
@@ -449,7 +461,7 @@ function GuidePanel() {
   const guide = useApp((s) => s.guide)!
   const guideTo = useApp((s) => s.guideTo)
   const exitGuide = useApp((s) => s.exitGuide)
-  const ch = CHALLENGES.find((c) => c.id === guide.challengeId)!
+  const ch = findChallenge(guide.challengeId)!
   const st = ch.steps[guide.step]
   const last = guide.step === ch.steps.length - 1
   return (

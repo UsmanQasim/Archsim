@@ -30,3 +30,20 @@ test('welcome dialog is accessible', async ({ page }) => {
   await expect(page.getByRole('dialog')).toBeVisible()
   expect(await audit(page)).toEqual([])
 })
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`problems, lessons and the challenge editor are accessible, ${theme} theme`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: theme })
+    await openApp(page)
+    if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+    const more = page.getByRole('button', { name: 'More' })
+    if (await page.getByRole('button', { name: /^Problems/ }).isVisible()) await page.getByRole('button', { name: /^Problems/ }).click()
+    else { await more.click(); await page.locator('.menu-item', { hasText: 'Problems' }).click() }
+    const tabs = page.getByRole('tablist', { name: 'Sections' })
+    expect(await audit(page)).toEqual([])
+    await tabs.getByRole('tab', { name: 'Learn' }).click()
+    expect(await audit(page)).toEqual([])
+    await tabs.getByRole('tab', { name: 'Create a challenge' }).click()
+    expect(await audit(page)).toEqual([])
+  })
+}
