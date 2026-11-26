@@ -92,13 +92,14 @@ h4 { margin: 18px 0 8px; font-size: 13px; font-weight: 700; color: var(--ink); }
 b, strong { font-weight: 700; }
 
 /* ------------------------------------------------------------ layout */
-.app { height: 100vh; height: 100dvh; display: grid; grid-template-rows: 52px minmax(0, 1fr) 320px; }
+.app { height: 100vh; height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr) 320px; }
+.app > * { min-width: 0; }
 .main { display: grid; grid-template-columns: var(--pal-w, 240px) minmax(0, 1fr) var(--insp-w, 340px); min-height: 0; }
 .stage { position: relative; display: grid; min-width: 0; min-height: 0; }
 .stage.view-split { grid-template-columns: 1fr 1fr; }
 .pane { position: relative; min-width: 0; min-height: 0; }
 .stage.view-split .pane-3d { border-left: 1px solid var(--line); }
-.app-bottom { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr); border-top: 1px solid var(--line); background: var(--paper); min-height: 0; }
+.app-bottom { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); border-top: 1px solid var(--line); background: var(--paper); min-height: 0; min-width: 0; }
 .app-bottom.is-collapsed { grid-template-rows: auto; }
 
 /* ------------------------------------------------------------ top bar */
@@ -405,7 +406,7 @@ select.provider, .clock select {
 .metric.bottleneck:disabled { opacity: 1; cursor: default; }
 
 /* ------------------------------------------------------------ dock */
-.dock { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; padding: 0 16px 12px; }
+.dock { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); min-height: 0; min-width: 0; padding: 0 16px 12px; }
 .dock-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 4px; }
 .dock-tabs { display: flex; gap: 4px; overflow-x: auto; min-width: 0; }
 .dock-tabs button {
@@ -879,3 +880,98 @@ body.resizing canvas { pointer-events: none; }
 .practice-actions { display: flex; align-items: center; gap: 14px; }
 .practice-notes-head { align-items: center; }
 .practice-clock b { font-size: 22px; } .practice-clock { margin-bottom: 4px; }
+
+/* Responsive workspace: side panels become temporary drawers on compact screens. */
+@media (max-width: 900px) {
+  .app {
+    grid-template-rows: auto minmax(0, 1fr) min(var(--dock-h), 42dvh);
+  }
+  .topbar {
+    position: relative; z-index: 35; height: auto; min-height: 52px; min-width: 0; max-width: 100%;
+    flex-wrap: wrap; align-content: center; gap: 4px 6px; padding: 6px 8px;
+  }
+  .main { position: relative; display: block; min-width: 0; overflow: hidden; }
+  .stage { position: absolute; inset: 0; }
+  .palette, .inspector {
+    position: absolute; top: 0; bottom: 0; z-index: 20;
+    width: min(340px, 88vw); box-shadow: var(--shadow-3);
+  }
+  .palette { left: 0; }
+  .inspector { right: 0; }
+  .stage.view-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+  .stage.view-split .pane-3d { border-left: 0; border-top: 1px solid var(--line); }
+  .metrics { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding: 8px 12px; }
+  .metric { flex: 0 0 155px; padding-inline: 12px; }
+  .metric:first-child { padding-left: 4px; }
+  .dock { padding: 0 8px 8px; }
+  .dock-head { gap: 4px; }
+  .dock-tabs { flex: 1; }
+  .dock-tabs button { flex: none; padding: 6px 9px; }
+  .dock-body { padding: 8px 4px 4px; }
+  .advice-list { grid-template-columns: minmax(0, 1fr); }
+  .chaos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .costpanel { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .challenge { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .challenge-grid { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 0 18px; }
+  .daytest { grid-template-columns: minmax(0, 1fr); gap: 16px; height: auto; }
+  .estimate { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .practice-start { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .practice-live { grid-template-columns: minmax(0, 1fr); gap: 16px; height: auto; }
+  .practice-side { gap: 8px; }
+  .phase-list { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .practice-summary { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .board-empty { margin-bottom: 16px; }
+}
+
+@media (max-width: 620px) {
+  .topbar { justify-content: flex-start; align-content: flex-start; }
+  .brand span { display: inline; }
+  .title-wrap { flex: 1 1 170px; }
+  .title-input { min-width: 90px; }
+  .save-status { display: none; }
+  .topbar > .menu { flex: 0 0 auto; }
+  .topbar > .menu .tbtn { padding-inline: 7px; }
+  .menu-pop, .menu-pop.wide { position: fixed; top: 54px; left: 8px; right: 8px; width: auto; max-height: min(72dvh, 620px); }
+  .tools { margin-left: auto; max-width: 100%; }
+  .clock { gap: 5px; margin-left: 0; }
+  .clock-face { min-width: 42px; }
+  .clock-time { font-size: 13px; }
+  .clock select { max-width: 88px; }
+  select.provider { max-width: 92px; }
+  .view-seg { order: 10; }
+  .view-seg button { padding: 4px 8px; }
+  .palette, .inspector { width: min(360px, 92vw); }
+  .react-flow__minimap { display: none; }
+  .dock-tabs button { padding: 6px 8px; font-size: 12.5px; }
+  .badge { display: none; }
+  .metrics { padding-inline: 8px; }
+  .metric { flex-basis: 138px; }
+  .metric-value { font-size: 17px; }
+  .metric-label { font-size: 11.5px; }
+  .chaos { grid-template-columns: minmax(0, 1fr); }
+  .est-inputs { grid-template-columns: minmax(0, 1fr); }
+  .est-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .prompts { columns: 1; }
+  .practice-notes-head { align-items: flex-start; flex-direction: column; }
+  .practice-actions { flex-wrap: wrap; gap: 8px; }
+  .phase-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .board-empty { width: min(420px, calc(100% - 24px)); margin: 0 12px 12px; padding: 12px; }
+  .board-empty-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .board-empty-actions button small { display: none; }
+  .keys { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 390px) {
+  .topbar { gap: 3px; padding-inline: 5px; }
+  .brand svg { width: 20px; }
+  .brand { gap: 4px; }
+  .title-wrap { flex-basis: 140px; }
+  .title-input { padding-inline: 4px; font-size: 12px; }
+  .clock select { max-width: 72px; }
+  .tbtn { padding: 4px 5px; }
+  .view-seg button { padding-inline: 6px; font-size: 11.5px; }
+  .board-tools { flex-wrap: wrap; max-width: calc(100% - 20px); }
+  .board-tools .btn { padding: 5px 7px; }
+  .map-head { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .map-legend { gap: 8px; font-size: 12px; }
+}

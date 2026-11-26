@@ -827,6 +827,135 @@ export const CHALLENGES: Challenge[] = [
       return g
     },
   },
+  // ============================================================ IoT telemetry
+  {
+    id: 'telemetry', title: 'IoT Telemetry Pipeline', difficulty: 'Hard', topic: 'Data pipelines',
+    brief: 'Ingest readings from 60,000 smart meters, absorb flash bursts, trigger useful analytics, and retain raw telemetry for later investigations.',
+    concepts: ['ingestion rate limits', 'partitioned event streams', 'backpressure', 'batch analytics', 'object-storage retention'],
+    hints: ['Do not make every device wait for an analytics query.', 'Partition the stream for peak writes, not the daily average.', 'Keep a raw archive so new analytics can replay historical events.'],
+    targets: { p99: 250, availability: 0.999, budget: 30000, backlogSec: 120 },
+    checks: [
+      { label: 'Ingestion is rate-limited before compute', why: 'Protects the service fleet and gives operators a predictable way to shed abusive or excess traffic.', test: (g) => has(g, 'ratelimiter') && reaches(g, isK('client'), isK('ratelimiter')) },
+      { label: 'Device writes enter a partitioned event stream', why: 'The stream absorbs bursts and separates device ingestion from downstream consumers.', test: (g) => K(g, 'stream').some((n) => n.data.config.shards >= 64) && reaches(g, isK('client'), isK('stream')) },
+      { label: 'Analytics consumes events through a stream processor', why: 'Batching keeps warehouse writes efficient and out of the synchronous ingest path.', test: (g) => reaches(g, isK('stream'), isK('warehouse'), isK('streamproc')) },
+      { label: 'Raw events are archived to object storage', why: 'A cheap immutable archive supports backfills, audits, and new analytics.', test: (g) => reaches(g, isK('stream'), isK('storage')) },
+    ],
+    steps: [
+      { title: 'Start with synchronous writes', why: 'A single API and SQL database are easy to understand, but a flash burst overwhelms the primary and couples ingest to every downstream consumer.' },
+      { title: 'Protect the ingestion tier', why: 'A gateway and rate limiter control admission while autoscaling containers absorb normal demand.' },
+      { title: 'Buffer device events', why: 'A partitioned stream accepts bursts quickly and lets consumers recover independently.' },
+      { title: 'Process and aggregate in batches', why: 'A stream processor batches analytics writes so the warehouse stays off the device request path.' },
+      { title: 'Keep a replayable raw archive', why: 'Object storage preserves original readings for retention, investigations, and future reprocessing.' },
+    ],
+    build: (step) => {
+      const { g, add, link, users, retire } = staged(step)
+      const u = users('devices', 1, 'Smart meters', 'us-east-1', 60000, 1, 0.05, 1, 'spike')
+      const app = add(0, 'ingest', 'container', 2, 1, 'Telemetry ingest', (s) => ({
+        instances: s >= 1 ? 12 : 2,
+        size: s >= 1 ? 'L' : 'M',
+        autoscale: s >= 1,
+        minInstances: s >= 1 ? 6 : 1,
+        maxInstances: 48,
+        ...(s >= 4 ? { arch: 'arm', pricing: 'reserved' } : {}),
+      }))
+      const db = add(0, 'db', 'sql', 4, 1, 'Telemetry SQL', { size: 'L' })
+      const gateway = add(1, 'gateway', 'gateway', 1, 1, 'Ingestion gateway')
+      const limiter = add(1, 'limit', 'ratelimiter', 2, 1, 'Device rate limit', { rateLimit: 50000 })
+      const stream = add(2, 'events', 'stream', 4, 1, 'Meter events', { shards: 64 })
+      const processor = add(3, 'processor', 'streamproc', 5, 1, 'Telemetry processor', {
+        instances: 24, size: 'M', autoscale: true, minInstances: 12, maxInstances: 60,
+        ...(step >= 4 ? { arch: 'arm', pricing: 'reserved' } : {}),
+      })
+      const warehouse = add(4, 'warehouse', 'warehouse', 7, 0, 'Analytics warehouse', { instances: 2, size: 'L', storageGB: 8000 })
+      const archive = add(4, 'archive', 'storage', 6, 2, 'Raw event archive', { storageGB: 50000 })
+      if (step >= 2) retire(true, db)
+      link(u, app, {}, 0, 1)
+      link(u, gateway, {}, 1)
+      link(gateway, limiter, {}, 1)
+      link(limiter, app, {}, 1)
+      link(app, db, {}, 0, 2)
+      link(app, stream, { filter: 'write' }, 2)
+      link(stream, processor, {}, 3)
+      link(processor, warehouse, {}, 4)
+      link(stream, archive, { mode: 'all' }, 4)
+      return g
+    },
+  },
+  // ============================================================ collaborative whiteboard
+  {
+    id: 'collab', title: 'Live Collaborative Whiteboard', difficulty: 'Hard', topic: 'Real-time',
+    brief: 'Let teams in North America and Europe edit shared boards together. Keep interactions responsive, preserve concurrent updates, and keep collaborators in sync through regional failures.',
+    concepts: ['multi-region routing', 'WebSockets', 'Pub/Sub fan-out', 'regional caches', 'conflict-aware persistence'],
+    hints: ['A normal request/response API is not enough to push edits to collaborators.', 'Use a fan-out path for live updates; do not make every socket poll the database.', 'Strong cross-region writes cost latency. Choose consistency intentionally and explain the trade-off.'],
+    targets: { p99: 500, availability: 0.999, budget: 24000 },
+    checks: [
+      { label: 'Both user populations use GeoDNS', why: 'Each team should reach its nearest healthy regional entry point.', test: (g) => K(g, 'client').length >= 2 && has(g, 'dns') && reaches(g, isK('client'), isK('dns')) },
+      { label: 'Live edits fan out from Pub/Sub to WebSockets', why: 'A publish/subscribe path distributes edits to connected collaborators without polling.', test: (g) => g.edges.some((e) => kindOf(g, e.source) === 'pubsub' && kindOf(g, e.target) === 'websocket' && e.data?.mode === 'all') },
+      { label: 'Each region has a cache for board reads', why: 'Regional caches reduce repeated read latency while the durable store remains authoritative.', test: (g) => K(g, 'cache').length >= 2 && g.edges.filter((e) => e.data?.filter === 'read' && kindOf(g, e.target) === 'cache').length >= 2 },
+      { label: 'Shared state uses a multi-region database', why: 'Concurrent edits must converge across regions; the consistency choice should be explicit.', test: (g) => K(g, 'globaldb').some((n) => n.data.config.replicas >= 2 && n.data.config.consistency === 'strong') },
+      { label: 'Regional application tiers autoscale', why: 'A busy collaboration session should not overload one fixed application fleet.', test: (g) => K(g, 'app', 'container', 'k8s').filter((n) => n.data.config.autoscale).length >= 2 },
+    ],
+    steps: [
+      { title: 'Prototype in one region', why: 'One application and database are a useful baseline, but distant users pay cross-continent latency and the region is a single point of failure.' },
+      { title: 'Route teams to regional app tiers', why: 'GeoDNS sends users to nearby healthy regions and separates regional compute capacity.' },
+      { title: 'Keep collaborators live', why: 'WebSockets maintain active sessions; Pub/Sub fans each edit out to connected collaborators instead of making them poll.' },
+      { title: 'Cache reads and persist shared state globally', why: 'Regional caches accelerate board reads. A strongly consistent multi-region database prevents conflicting edits from silently diverging, at the cost of slower writes.' },
+      { title: 'Scale and right-size the regional fleets', why: 'Autoscaling absorbs busy sessions while ARM and reserved baselines reduce the cost of steady traffic.' },
+    ],
+    build: (step) => {
+      const { g, add, link, users, retire } = staged(step)
+      const us = users('users-us', 0, 'Teams · New York', 'city-nyc', 120000, 2.5, 0.8, 8)
+      const eu = users('users-eu', 2, 'Teams · London', 'city-london', 90000, 2.5, 0.8, 8)
+      const dns = add(1, 'dns', 'dns', 1, 1, 'GeoDNS')
+      const lbUS = add(1, 'lb-us', 'lb', 2, 0, 'US load balancer', { region: 'us-east-1' })
+      const lbEU = add(1, 'lb-eu', 'lb', 2, 2, 'EU load balancer', { region: 'eu-central-1' })
+      const appUS = add(0, 'app-us', 'app', 3, 0, 'Board API · US', (s) => ({
+        region: 'us-east-1', instances: s >= 4 ? 12 : 4, size: 'M', autoscale: s >= 1,
+        minInstances: s >= 4 ? 6 : 2, maxInstances: 40,
+        ...(s >= 4 ? { arch: 'arm', pricing: 'reserved' } : {}),
+      }))
+      const appEU = add(1, 'app-eu', 'app', 3, 2, 'Board API · EU', (s) => ({
+        region: 'eu-central-1', instances: s >= 4 ? 12 : 4, size: 'M', autoscale: s >= 1,
+        minInstances: s >= 4 ? 6 : 2, maxInstances: 40,
+        ...(s >= 4 ? { arch: 'arm', pricing: 'reserved' } : {}),
+      }))
+      const sql = add(0, 'sql', 'sql', 5, 1, 'Boards SQL', { region: 'us-east-1', size: 'L' })
+      const cacheUS = add(2, 'cache-us', 'cache', 4, 0, 'Board cache · US', { region: 'us-east-1', hitRate: 0.8, instances: 2 })
+      const cacheEU = add(2, 'cache-eu', 'cache', 4, 2, 'Board cache · EU', { region: 'eu-central-1', hitRate: 0.8, instances: 2 })
+      const pubsub = add(2, 'updates', 'pubsub', 5, 3, 'Board updates')
+      const wsUS = add(2, 'ws-us', 'websocket', 6, 2, 'Live sessions · US', { region: 'us-east-1', instances: 4, autoscale: true, minInstances: 2, maxInstances: 30 })
+      const wsEU = add(2, 'ws-eu', 'websocket', 6, 3, 'Live sessions · EU', { region: 'eu-central-1', instances: 4, autoscale: true, minInstances: 2, maxInstances: 30 })
+      const globalDB = add(3, 'global-db', 'globaldb', 6, 1, 'Shared board state', { replicas: 3, shards: 4, consistency: 'strong' })
+      if (step >= 3) retire(true, sql)
+
+      if (step < 1) {
+        link(us, appUS)
+        link(eu, appUS)
+      } else {
+        link(us, dns)
+        link(eu, dns)
+        link(dns, lbUS)
+        link(dns, lbEU)
+        link(lbUS, appUS)
+        link(lbEU, appEU)
+      }
+      link(appUS, sql, {}, 0, 3)
+      link(appEU, sql, {}, 1, 3)
+      link(appUS, cacheUS, { filter: 'read' }, 2)
+      link(appEU, cacheEU, { filter: 'read' }, 2)
+      link(cacheUS, sql, {}, 2, 3)
+      link(cacheEU, sql, {}, 2, 3)
+      link(appUS, globalDB, { filter: 'write' }, 3)
+      link(appEU, globalDB, { filter: 'write' }, 3)
+      link(cacheUS, globalDB, {}, 3)
+      link(cacheEU, globalDB, {}, 3)
+      link(appUS, pubsub, { mode: 'all', filter: 'write' }, 2)
+      link(appEU, pubsub, { mode: 'all', filter: 'write' }, 2)
+      link(pubsub, wsUS, { mode: 'all' }, 2)
+      link(pubsub, wsEU, { mode: 'all' }, 2)
+      return g
+    },
+  },
 ]
 
 export const TOPICS = [...new Set(CHALLENGES.map((c) => c.topic))]

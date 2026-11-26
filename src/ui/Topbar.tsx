@@ -272,7 +272,7 @@ export function HelpModal() {
           <li><b>Watch.</b> The clock runs through a day. Traffic rises and falls, autoscaling reacts, queues fill and drain. The Model view shows it as a 3D table model.</li>
           <li><b>Break it.</b> In the Chaos tab, take components down, lose a zone or a whole region, cut links, add delay, multiply traffic, or empty every cache. Turn on retries for a connection to see a retry storm, then add a circuit breaker to stop it.</li>
           <li><b>Improve.</b> The Advisor points out single points of failure, overloaded parts, slow cross-region calls and retry storms. The Cost tab finds reserved, spot and ARM savings. Most come with a one-click fix.</li>
-          <li><b>Practise.</b> 16 classic interview problems, from a URL shortener to Uber, Ticketmaster, payments and an LLM assistant. Try them yourself, or open <i>See the solution</i> to walk through how a good design comes together, one step at a time.</li>
+          <li><b>Practise.</b> {CHALLENGES.length} classic interview problems, from a URL shortener to Uber, Ticketmaster, payments, IoT telemetry, collaborative apps, and an LLM assistant. Try them yourself, or open <i>See the solution</i> to walk through how a good design comes together, one step at a time.</li>
           <li><b>Pick your cloud.</b> Switch AWS / Google Cloud / Azure in the top bar to see the matching product names.</li>
         </ol>
         <h2 className="subh">Shortcuts</h2>

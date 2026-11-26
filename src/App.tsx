@@ -143,6 +143,18 @@ export default function App() {
     }
     return startSimLoop()
   }, [])
+  useEffect(() => {
+    const compact = window.matchMedia('(max-width: 900px)')
+    const closeSidebarsOnCompact = () => {
+      if (!compact.matches) return
+      const state = useApp.getState()
+      if (state.paletteOpen) state.togglePalette()
+      if (state.inspectorOpen) state.toggleInspector()
+    }
+    closeSidebarsOnCompact()
+    compact.addEventListener('change', closeSidebarsOnCompact)
+    return () => compact.removeEventListener('change', closeSidebarsOnCompact)
+  }, [])
 
   const bottomH = dockOpen ? dock.h : 66
 
@@ -151,7 +163,7 @@ export default function App() {
       <div
         className="app"
         style={{
-          gridTemplateRows: `52px minmax(0, 1fr) ${bottomH}px`,
+          gridTemplateRows: 'auto minmax(0, 1fr) var(--dock-h)',
           ['--dock-h' as string]: `${bottomH}px`,
           ['--pal-w' as string]: paletteOpen ? undefined : '0px',
           ['--insp-w' as string]: inspectorOpen ? undefined : '0px',
@@ -213,7 +225,6 @@ export default function App() {
         <div className="toast-region" role="status" aria-live="polite" aria-atomic="true">
           {toast && <div className="toast">{toast}</div>}
         </div>
-        <div className="small-screen">ArchSim is built for a laptop or desktop screen (1280 px+). Rotate or widen your window for the full editor.</div>
       </div>
     </ReactFlowProvider>
   )
