@@ -986,3 +986,11 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 .app.layout-narrow .dock { padding: 0 8px 8px; }
 /* keep the board buttons clear of the "show components" tab when the side panel is hidden */
 .stage:has(> .panel-reopen.left) .board-tools { margin-left: 136px !important; }
+/* sticky notes: drag by the top strip or the edge; the text area is for typing */
+.note-grip { flex: none; height: 20px; display: grid; place-items: center; cursor: grab; border-radius: 3px 3px 0 0; }
+.note-grip svg { fill: color-mix(in srgb, var(--note-ink) 35%, transparent); }
+.note-grip:hover { background: color-mix(in srgb, var(--note-ink) 6%, transparent); }
+.note-grip:hover svg { fill: color-mix(in srgb, var(--note-ink) 60%, transparent); }
+.react-flow__node.dragging .note-grip { cursor: grabbing; }
+.note-text { padding-top: 2px; }
+.note { cursor: grab; }

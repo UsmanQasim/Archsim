@@ -9,6 +9,8 @@
 Sketch an architecture on a whiteboard, then watch traffic, latency, outages and the monthly bill react, live.
 Free, open source, runs entirely in your browser.
 
+**[Open ArchSim](https://archsim-pi.vercel.app/)** · [Watch the 70-second demo](docs/archsim-demo.mp4) · [How it works](docs/ARCHITECTURE.md)
+
 [![CI](https://github.com/UsmanQasim/Archsim/actions/workflows/ci.yml/badge.svg)](https://github.com/UsmanQasim/Archsim/actions/workflows/ci.yml)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-2457c5)](LICENSE)
 ![No backend](https://img.shields.io/badge/backend-none-2f8a4c)
@@ -70,10 +72,12 @@ Node 20 or newer.
 
 It is a static site with no backend, database or keys.
 
-- **Vercel**: import the repo. It detects Vite (`npm run build`, output `dist`). `vercel.json` already has the SPA rewrite.
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FUsmanQasim%2FArchsim)
+
+- **Vercel**: use the button, or import the repo. It detects Vite (`npm run build`, output `dist`). `vercel.json` already has the SPA rewrite.
 - **Netlify, Cloudflare Pages, GitHub Pages**: build command `npm run build`, publish directory `dist`. The build uses relative paths, so it works from a sub-folder.
 
-After deploying, set `og:image` in `index.html` to the full URL of `og-image.png` so link previews show the picture.
+After deploying your own copy, change the `og:url`, `og:image` and `twitter:image` addresses in `index.html` to your domain so link previews show the picture.
 
 ## How it works
 
@@ -92,6 +96,10 @@ src/ui/           board, 3D model, world map, panels
 ```
 
 The numbers are teaching approximations, not a capacity plan: about 1 ms of round trip per 100 km, M/D/1-style queueing, tail latency combined along a path, list-price ballparks. They are all in `engine.ts` and `catalog.ts` if you want to argue with them.
+
+## Designs as files
+
+Every design is a small JSON document that you can export, import, keep in a repo or generate from a script. Share links carry the same JSON in the address. [docs/FORMAT.md](docs/FORMAT.md) describes it, and a test keeps its example working.
 
 ## Contributing
 
