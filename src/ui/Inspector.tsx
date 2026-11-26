@@ -125,6 +125,12 @@ function Overview() {
             {ASSUMPTIONS.map((a) => <li key={a}>{a}</li>)}
           </ul>
         )}
+        {showModel && (
+          <p className="small muted">
+            Each figure next to its published source:{' '}
+            <a href="https://github.com/UsmanQasim/Archsim/blob/main/docs/NUMBERS.md" target="_blank" rel="noreferrer">where the numbers come from</a>.
+          </p>
+        )}
       </section>
     </div>
   )
@@ -308,7 +314,7 @@ function Field({ f, n, disabled, onChange }: { f: FieldKey; n: SNode; disabled: 
       }
       const opts = isClient ? LOCATIONS : cloudRegions
       control = (
-        <select value={cfg.region} disabled={disabled} onChange={(e) => onChange({ region: e.target.value })}>
+        <select aria-label={String(label)} value={cfg.region} disabled={disabled} onChange={(e) => onChange({ region: e.target.value })}>
           {isClient && <optgroup label="Cities">{LOCATIONS.filter((l) => !l.cloud).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>}
           <optgroup label="Cloud regions">{opts.filter((l) => l.cloud).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
         </select>
@@ -317,7 +323,7 @@ function Field({ f, n, disabled, onChange }: { f: FieldKey; n: SNode; disabled: 
     }
     case 'select':
       control = (
-        <select value={String(v)} disabled={disabled} onChange={(e) => onChange({ [f]: e.target.value } as Partial<NodeConfig>)}>
+        <select aria-label={String(label)} value={String(v)} disabled={disabled} onChange={(e) => onChange({ [f]: e.target.value } as Partial<NodeConfig>)}>
           {meta.options!.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       )
@@ -325,7 +331,7 @@ function Field({ f, n, disabled, onChange }: { f: FieldKey; n: SNode; disabled: 
     case 'toggle':
       control = (
         <label className="switch">
-          <input type="checkbox" checked={!!v} disabled={disabled} onChange={(e) => onChange({ [f]: e.target.checked } as Partial<NodeConfig>)} />
+          <input type="checkbox" aria-label={String(label)} checked={!!v} disabled={disabled} onChange={(e) => onChange({ [f]: e.target.checked } as Partial<NodeConfig>)} />
           <span />
         </label>
       )
@@ -333,7 +339,7 @@ function Field({ f, n, disabled, onChange }: { f: FieldKey; n: SNode; disabled: 
     case 'slider':
       control = (
         <div className="slider">
-          <input type="range" min={meta.min} max={meta.max} step={meta.step} value={Number(v)} disabled={disabled} onChange={(e) => onChange({ [f]: Number(e.target.value) } as Partial<NodeConfig>)} />
+          <input type="range" aria-label={String(label)} min={meta.min} max={meta.max} step={meta.step} value={Number(v)} disabled={disabled} onChange={(e) => onChange({ [f]: Number(e.target.value) } as Partial<NodeConfig>)} />
           <span className="slider-v">{meta.percent ? fmtPct(Number(v), 0) : Number(v)}</span>
         </div>
       )
@@ -343,6 +349,7 @@ function Field({ f, n, disabled, onChange }: { f: FieldKey; n: SNode; disabled: 
         <div className="numfield">
           <input
             type="number"
+            aria-label={String(label)}
             min={meta.min}
             max={meta.max}
             step={meta.step}
@@ -426,7 +433,7 @@ function EdgeInspector({ e }: { e: SEdge }) {
           <div className="field">
             <label>Weight</label>
             <div className="numfield">
-              <input type="number" min={0} max={100} step={1} value={d.weight} onChange={(ev) => updateEdge(e.id, { weight: Math.max(0, Number(ev.target.value) || 0) })} />
+              <input type="number" aria-label="Weight" min={0} max={100} step={1} value={d.weight} onChange={(ev) => updateEdge(e.id, { weight: Math.max(0, Number(ev.target.value) || 0) })} />
             </div>
           </div>
         )}
@@ -444,7 +451,7 @@ function EdgeInspector({ e }: { e: SEdge }) {
         <div className="field">
           <label title="Stop calling a target that is failing more than half the time; fail fast instead.">Circuit breaker</label>
           <label className="switch">
-            <input type="checkbox" checked={!!d.breaker} onChange={(ev) => updateEdge(e.id, { breaker: ev.target.checked })} />
+            <input type="checkbox" aria-label="Circuit breaker" checked={!!d.breaker} onChange={(ev) => updateEdge(e.id, { breaker: ev.target.checked })} />
             <span />
           </label>
           <div className="field-extra">{d.retries ? 'Use idempotency keys so a retried call is never applied twice. Add backoff + jitter in real code.' : 'No retries: a transient error fails the request.'}</div>
@@ -458,7 +465,7 @@ function EdgeInspector({ e }: { e: SEdge }) {
         <div className="field">
           <label>Injected latency</label>
           <div className="slider">
-            <input type="range" min={0} max={1000} step={10} value={delay} onChange={(ev) => setEdgeDelay(e.id, Number(ev.target.value))} />
+            <input type="range" aria-label="Injected latency" min={0} max={1000} step={10} value={delay} onChange={(ev) => setEdgeDelay(e.id, Number(ev.target.value))} />
             <span className="slider-v">{delay} ms</span>
           </div>
         </div>

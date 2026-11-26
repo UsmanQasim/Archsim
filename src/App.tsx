@@ -169,7 +169,14 @@ export default function App() {
     } catch {
       /* ignore */
     }
-    return startSimLoop()
+    // start simulating once the first frame is on screen, so the page paints sooner
+    let stop: (() => void) | undefined
+    const ric = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1))
+    const id = ric(() => (stop = startSimLoop()), { timeout: 400 })
+    return () => {
+      ;(window.cancelIdleCallback ?? window.clearTimeout)(id)
+      stop?.()
+    }
   }, [])
 
   const bottomH = dockOpen ? dock.h : 66
@@ -229,6 +236,9 @@ export default function App() {
               role="separator"
               aria-orientation="horizontal"
               aria-label="Resize bottom panel"
+              aria-valuenow={Math.round(dock.h)}
+              aria-valuemin={180}
+              aria-valuemax={Math.max(180, window.innerHeight - 260)}
               tabIndex={0}
               onPointerDown={dock.start}
               onDoubleClick={() => dock.setH(dock.h > 320 ? 280 : 440)}

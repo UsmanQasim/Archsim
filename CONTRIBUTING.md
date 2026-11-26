@@ -18,9 +18,12 @@ npm run dev
 Before you open a pull request:
 
 ```bash
+npm run lint
 npm run typecheck
 npm test
 npm run build
+npx playwright install chromium   # once
+npm run e2e
 ```
 
 ## Style

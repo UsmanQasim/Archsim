@@ -198,7 +198,7 @@ export const useApp = create<AppState>((set, get) => ({
   nodes: [],
   edges: [],
   selection: null,
-  view: 'split',
+  view: '2d',
   playing: true,
   speed: 600,
   time: 9 * 3600,

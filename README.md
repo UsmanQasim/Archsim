@@ -63,7 +63,9 @@ Most system design practice is reading. You draw boxes, you say "add a cache", a
 npm install
 npm run dev        # http://localhost:5173
 npm test           # engine tests, including every challenge's reference solution
+npm run lint       # ESLint
 npm run build      # type-check and build into dist/
+npm run e2e        # browser tests and accessibility checks against the build (Playwright)
 ```
 
 Node 20 or newer.
@@ -95,11 +97,15 @@ src/store.ts      app state, undo and redo, autosave, share links
 src/ui/           board, 3D model, world map, panels
 ```
 
-The numbers are teaching approximations, not a capacity plan: about 1 ms of round trip per 100 km, M/D/1-style queueing, tail latency combined along a path, list-price ballparks. They are all in `engine.ts` and `catalog.ts` if you want to argue with them.
+The numbers are teaching approximations, not a capacity plan: about 1 ms of round trip per 100 km, M/D/1-style queueing, tail latency combined along a path, list-price ballparks. They are all in `engine.ts` and `catalog.ts` if you want to argue with them, and [docs/NUMBERS.md](docs/NUMBERS.md) lists each one next to the published figure it is based on.
 
 ## Designs as files
 
 Every design is a small JSON document that you can export, import, keep in a repo or generate from a script. Share links carry the same JSON in the address. [docs/FORMAT.md](docs/FORMAT.md) describes it, and a test keeps its example working.
+
+## Quality
+
+Every push runs ESLint, the type checker, 32 engine tests (every challenge's reference solution must pass its own targets) and 17 browser tests on desktop and phone sizes, including automated accessibility checks in both themes. Lighthouse on the production build scores 100 for accessibility, best practices and SEO, 100 for desktop performance and about 90 for mobile performance.
 
 ## Contributing
 

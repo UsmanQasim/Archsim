@@ -71,3 +71,5 @@ Desktop.ini
 
 # PWA dev build
 dev-dist/
+test-results/
+playwright-report/

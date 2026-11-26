@@ -1,0 +1,15 @@
+# ArchSim
+
+> A free, client-only system design simulator. Build an architecture from 29 cloud components, then watch traffic, latency, failures and monthly cost react live. Includes 18 interview problems with reference solutions.
+
+ArchSim runs entirely in the browser. A design is a JSON document; a share link is that JSON compressed with lz-string after `#g=`.
+
+## Docs
+
+- [Design format](https://github.com/UsmanQasim/Archsim/blob/main/docs/FORMAT.md): the JSON schema for designs and share links
+- [How the simulation works](https://github.com/UsmanQasim/Archsim/blob/main/docs/ARCHITECTURE.md): the traffic, latency, failure and cost model
+- [Where the numbers come from](https://github.com/UsmanQasim/Archsim/blob/main/docs/NUMBERS.md): sources for latency and price assumptions
+
+## Source
+
+- [GitHub repository](https://github.com/UsmanQasim/Archsim)

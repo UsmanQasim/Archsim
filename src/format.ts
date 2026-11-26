@@ -52,7 +52,7 @@ export function utilColor(u: number, idle = false): string {
 }
 
 export const MARKERS = {
-  light: { ok: '#2457c5', warn: '#b86e0a', bad: '#c8372d', good: '#1e8a4c', idle: '#c9d2ce' },
+  light: { ok: '#2457c5', warn: '#9a5c06', bad: '#c8372d', good: '#146b39', idle: '#c9d2ce' },
   dark: { ok: '#8fb1f5', warn: '#e8b264', bad: '#f18c80', good: '#7cc99c', idle: '#464d53' },
 }
 

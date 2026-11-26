@@ -9,6 +9,7 @@ export default defineConfig({
     // installable, and works offline after the first visit
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'script-defer',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'ArchSim: system design simulator',
