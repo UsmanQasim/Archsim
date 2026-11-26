@@ -23,10 +23,16 @@ const Ico = ({ d, size = 18 }: { d: string; size?: number }) => (
 function Menu({ label, children, wide }: { label: string; children: (close: () => void) => ReactNode; wide?: boolean }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (!open) return
     const h = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
     window.addEventListener('mousedown', h)
     window.addEventListener('keydown', k)
     return () => {
@@ -36,7 +42,16 @@ function Menu({ label, children, wide }: { label: string; children: (close: () =
   }, [open])
   return (
     <div className="menu" ref={ref}>
-      <button className={`tbtn ${open ? 'on' : ''}`} onClick={() => setOpen(!open)} aria-expanded={open}>{label}<Chevron /></button>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={`tbtn ${open ? 'on' : ''}`}
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup="true"
+      >
+        {label}<Chevron />
+      </button>
       {open && <div className={`menu-pop ${wide ? 'wide' : ''}`}>{children(() => setOpen(false))}</div>}
     </div>
   )
@@ -52,6 +67,7 @@ const SPEEDS = [
 
 export function Topbar() {
   const title = useApp((s) => s.title)
+  const saveStatus = useApp((s) => s.saveStatus)
   const setTitle = useApp((s) => s.setTitle)
   const view = useApp((s) => s.view)
   const setView = useApp((s) => s.setView)
@@ -92,7 +108,16 @@ export function Topbar() {
         </svg>
         <span>ArchSim</span>
       </div>
-      <input className="title-input" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Design title" />
+      <div className="title-wrap">
+        <input className="title-input" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Design title" />
+        <span className={`save-dot ${saveStatus === 'saving' ? 'saving' : ''}`} title={saveStatus === 'saving' ? 'Saving to browser storage…' : 'Saved locally'}>
+          {saveStatus === 'saving' ? 'Saving…' : 'Saved'}
+        </span>
+      </div>
+      <span className={`save-status ${saveStatus}`} role="status" aria-live="polite" title={saveStatus === 'error' ? 'Local saving is unavailable' : 'Changes are saved in this browser'}>
+        <i aria-hidden />
+        {saveStatus === 'saving' ? 'Saving' : saveStatus === 'error' ? 'Not saved' : 'Saved'}
+      </span>
 
       <Menu label="Templates">
         {(close) => TEMPLATES.map((t) => (
@@ -139,17 +164,21 @@ export function Topbar() {
           <span className="clock-day">Day {dayNumber(time)}</span>
           <span className="clock-time">{fmtClock(time)}</span>
         </div>
-        <input
-          className="scrub"
-          type="range"
-          min={0}
-          max={86399}
-          step={300}
-          value={tod}
-          onChange={(e) => setTime(Math.floor(time / 86400) * 86400 + Number(e.target.value))}
-          aria-label="Time of day"
-          style={{ ['--load' as string]: `${Math.round(load * 100)}%` }}
-        />
+        <div className="scrub-box" title={`Daily wave level: ${Math.round(load * 100)}% of peak`}>
+          <input
+            className="scrub"
+            type="range"
+            min={0}
+            max={86399}
+            step={300}
+            value={tod}
+            onChange={(e) => setTime(Math.floor(time / 86400) * 86400 + Number(e.target.value))}
+            aria-label="Time of day"
+          />
+          <div className="scrub-meter" aria-hidden="true">
+            <span style={{ width: `${Math.round(load * 100)}%` }} />
+          </div>
+        </div>
         <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Simulation speed">
           {SPEEDS.map((s) => <option key={s.v} value={s.v}>{s.l}</option>)}
         </select>
@@ -194,11 +223,47 @@ export function Topbar() {
 export function HelpModal() {
   const open = useApp((s) => s.helpOpen)
   const setHelp = useApp((s) => s.setHelp)
-  if (!open) return null
+  const dlg = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const d = dlg.current
+    if (!d) return
+    if (open && !d.open) d.showModal()
+    else if (!open && d.open) d.close()
+  }, [open])
+  useEffect(() => {
+    const d = dlg.current
+    if (!d) return
+    const onClose = () => {
+      d.returnValue = ''
+      setHelp(false)
+    }
+    let pressedOutside = false
+    const outside = (e: PointerEvent) => {
+      const r = d.getBoundingClientRect()
+      return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom
+    }
+    const onDown = (e: PointerEvent) => { pressedOutside = outside(e) }
+    const onUp = (e: PointerEvent) => {
+      if (!('closedBy' in HTMLDialogElement.prototype) && pressedOutside && outside(e) && d.open) d.close()
+      pressedOutside = false
+    }
+    d.addEventListener('close', onClose)
+    d.addEventListener('pointerdown', onDown)
+    d.addEventListener('pointerup', onUp)
+    return () => {
+      d.removeEventListener('close', onClose)
+      d.removeEventListener('pointerdown', onDown)
+      d.removeEventListener('pointerup', onUp)
+    }
+  }, [setHelp])
+
   return (
-    <div className="modal-back" onClick={() => setHelp(false)}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="help-title">
-        <h2 id="help-title">Welcome to ArchSim</h2>
+    <dialog ref={dlg} className="modal-dlg" aria-labelledby="help-title" {...({ closedby: 'any' } as Record<string, string>)}>
+      <div className="modal">
+        <div className="modal-head">
+          <h1 id="help-title">Welcome to ArchSim</h1>
+          <button type="button" className="iconbtn" onClick={() => setHelp(false)} aria-label="Close help">✕</button>
+        </div>
         <p className="muted" style={{ marginTop: 0 }}>A whiteboard for system design that actually runs. Sketch an architecture, then watch real-ish traffic, latency, failures and cost flow through it.</p>
         <ol>
           <li><b>Build.</b> Drag components from the left onto the board. Draw a connection from the blue dot on a component's right edge.</li>
@@ -210,7 +275,7 @@ export function HelpModal() {
           <li><b>Practise.</b> 16 classic interview problems, from a URL shortener to Uber, Ticketmaster, payments and an LLM assistant. Try them yourself, or open <i>See the solution</i> to walk through how a good design comes together, one step at a time.</li>
           <li><b>Pick your cloud.</b> Switch AWS / Google Cloud / Azure in the top bar to see the matching product names.</li>
         </ol>
-        <h3>Shortcuts</h3>
+        <h2 className="subh">Shortcuts</h2>
         <div className="keys">
           <span><kbd>Space</kbd> play / pause</span>
           <span><kbd>Del</kbd> delete selection</span>
@@ -220,11 +285,13 @@ export function HelpModal() {
           <span><kbd>Esc</kbd> deselect</span>
           <span><kbd>Ctrl</kbd>+<kbd>K</kbd> add a component</span>
           <span><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd> / <kbd>D</kbd> copy, paste, duplicate</span>
+          <span><kbd>F</kbd> fit board / model</span>
+          <span><kbd>[</kbd> / <kbd>]</kbd> / <kbd>\</kbd> toggle panels</span>
           <span><kbd>Shift</kbd>+drag select several</span>
         </div>
         <p className="muted small">The numbers are teaching approximations based on queueing theory, distances between cities and list prices. The right-hand panel explains how each one is worked out.</p>
-        <button className="btn btn-accent" onClick={() => setHelp(false)}>Start building</button>
+        <button type="button" className="btn btn-accent" onClick={() => setHelp(false)}>Start building</button>
       </div>
-    </div>
+    </dialog>
   )
 }

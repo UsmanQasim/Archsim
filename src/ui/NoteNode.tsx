@@ -12,6 +12,7 @@ const COLORS: { id: NoteColor; label: string }[] = [
 /** A sticky note for the whiteboard. Not part of the simulation. */
 function NoteNodeView({ id, data, selected }: NodeProps<NNode>) {
   const updateNote = useApp((s) => s.updateNote)
+  const removeNote = useApp((s) => s.removeNote)
   return (
     <div className={`note note-${data.color} ${selected ? 'is-sel' : ''}`}>
       <NodeResizer isVisible={selected} minWidth={140} minHeight={90} lineClassName="note-resize-line" handleClassName="note-resize-handle" />
@@ -25,8 +26,9 @@ function NoteNodeView({ id, data, selected }: NodeProps<NNode>) {
       {selected && (
         <div className="note-colors nodrag">
           {COLORS.map((c) => (
-            <button key={c.id} className={`swatch note-${c.id} ${data.color === c.id ? 'on' : ''}`} onClick={() => updateNote(id, { color: c.id })} aria-label={`${c.label} note`} title={c.label} />
+            <button type="button" key={c.id} className={`swatch note-${c.id} ${data.color === c.id ? 'on' : ''}`} onClick={() => updateNote(id, { color: c.id })} aria-label={`${c.label} note`} title={c.label} />
           ))}
+          <button type="button" className="note-del" onClick={() => removeNote(id)} aria-label="Delete note">Delete</button>
         </div>
       )}
     </div>

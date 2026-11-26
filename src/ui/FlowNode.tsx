@@ -12,6 +12,12 @@ function FlowNodeView({ id, data, selected }: NodeProps<SNode>) {
   const m = useSim((s) => s.result?.nodes[id])
   const failed = useApp((s) => s.chaos.failedNodes.includes(id) || (data.config.region !== 'global' && data.kind !== 'client' && s.chaos.failedRegions.includes(data.config.region)))
   const provider = useApp((s) => s.provider)
+  const sel = useApp((s) => s.selection)
+  const linked = useApp((s) => {
+    if (!sel || sel.type !== 'node') return 'none'
+    if (sel.id === id) return 'self'
+    return s.edges.some((e) => (e.source === sel.id && e.target === id) || (e.target === sel.id && e.source === id)) ? 'linked' : 'dim'
+  })
   const def = CATALOG[data.kind]
   const isClient = data.kind === 'client'
   const load = m ? m.inRead + m.inWrite : 0
@@ -20,7 +26,10 @@ function FlowNodeView({ id, data, selected }: NodeProps<SNode>) {
   const showUtil = !isClient && !NO_UTIL.includes(data.kind)
 
   return (
-    <div className={`fnode ${selected ? 'is-sel' : ''} ${failed ? 'is-failed' : ''} ${u > 1 && !failed ? 'is-hot' : ''}`} style={{ ['--accent' as string]: def.color }}>
+    <div
+      className={`fnode ${selected ? 'is-sel' : ''} ${linked === 'linked' ? 'is-linked' : ''} ${linked === 'dim' ? 'is-dim' : ''} ${failed ? 'is-failed' : ''} ${u > 1 && !failed ? 'is-hot' : ''}`}
+      style={{ ['--accent' as string]: def.color }}
+    >
       {!isClient && <Handle type="target" position={Position.Left} className="port port-in" />}
       <div className="fnode-head">
         <span className="tile"><KindIcon kind={data.kind} size={17} /></span>
@@ -32,7 +41,7 @@ function FlowNodeView({ id, data, selected }: NodeProps<SNode>) {
       </div>
       <div className="fnode-body">
         {failed ? (
-          <div className="fnode-down">Down</div>
+          <div className="fnode-down">● Down</div>
         ) : isClient ? (
           <>
             <Row k="Sending" v={`${fmtNum(m?.offered ?? 0)}/s`} />
@@ -42,6 +51,7 @@ function FlowNodeView({ id, data, selected }: NodeProps<SNode>) {
         ) : (
           <>
             <Row k="Incoming" v={`${fmtNum(load)}/s`} />
+            {m && load > 0.01 && <Row k="Latency" v={fmtMs(m.latency)} warn={m.latency > 250} />}
             {showUtil && (
               <>
                 <div className="ubar" title={`Utilisation ${fmtPct(u)}`}>
@@ -50,6 +60,7 @@ function FlowNodeView({ id, data, selected }: NodeProps<SNode>) {
                 <Row k="Busy" v={fmtPct(u, 0)} warn={u >= 0.85} />
               </>
             )}
+            {u > 1 ? <span className="fnode-badge bad">▲ Overloaded</span> : u >= 0.85 ? <span className="fnode-badge warn">● High load</span> : null}
             {def.scalable && data.kind !== 'sql' && data.kind !== 'websocket' && (
               <Row k={data.kind === 'cache' || data.kind === 'search' ? 'Nodes' : 'Instances'} v={`${m?.instances ?? data.config.instances}${data.config.autoscale ? ' (auto)' : ''}`} />
             )}

@@ -62,6 +62,7 @@ const resetRuntime = (ids?: string[]) => {
 // ---------------- app state ----------------
 interface AppState {
   title: string
+  saveStatus: 'saved' | 'saving' | 'error'
   nodes: SNode[]
   edges: SEdge[]
   selection: Selection
@@ -90,6 +91,14 @@ interface AppState {
   guide: Guide | null
   theme: 'light' | 'dark'
   toggleTheme: () => void
+  paletteOpen: boolean
+  inspectorOpen: boolean
+  dockOpen: boolean
+  togglePalette: () => void
+  toggleInspector: () => void
+  toggleDock: () => void
+  triggerFit: () => void
+  removeNote: (id: string) => void
 
   onNodesChange: (c: NodeChange<SNode>[]) => void
   onEdgesChange: (c: EdgeChange<SEdge>[]) => void
@@ -185,6 +194,7 @@ function avgPos(ns: SNode[]) {
 
 export const useApp = create<AppState>((set, get) => ({
   title: 'Untitled system',
+  saveStatus: 'saved',
   nodes: [],
   edges: [],
   selection: null,
@@ -236,6 +246,14 @@ export const useApp = create<AppState>((set, get) => ({
     }
     set({ theme })
   },
+  paletteOpen: true,
+  inspectorOpen: true,
+  dockOpen: true,
+  togglePalette: () => set((s) => ({ paletteOpen: !s.paletteOpen })),
+  toggleInspector: () => set((s) => ({ inspectorOpen: !s.inspectorOpen })),
+  toggleDock: () => set((s) => ({ dockOpen: !s.dockOpen })),
+  triggerFit: () => set((s) => ({ fitTick: s.fitTick + 1 })),
+  removeNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
 
   checkpoint: (key) => {
     const now = Date.now()
@@ -284,6 +302,16 @@ export const useApp = create<AppState>((set, get) => ({
     const s = get()
     if (!c.source || !c.target || c.source === c.target) return
     if (s.edges.some((e) => e.source === c.source && e.target === c.target)) return
+    const reachable = (from: string, goal: string, seen = new Set<string>()): boolean => {
+      if (from === goal) return true
+      if (seen.has(from)) return false
+      seen.add(from)
+      return s.edges.some((e) => e.source === from && reachable(e.target, goal, seen))
+    }
+    if (reachable(c.target, c.source)) {
+      get().showToast('That connection would create a cycle')
+      return
+    }
     get().checkpoint()
     const src = s.nodes.find((n) => n.id === c.source)
     const tgt = s.nodes.find((n) => n.id === c.target)
@@ -375,6 +403,7 @@ export const useApp = create<AppState>((set, get) => ({
       limitReport: null,
       time: 9 * 3600,
       dockTab: keepDock ? s.dockTab : challengeId ? 'challenge' : s.dockTab === 'challenge' ? 'advisor' : s.dockTab,
+      fitTick: keepGuide ? s.fitTick : s.fitTick + 1,
     })
     resetRuntime()
   },
@@ -474,7 +503,10 @@ export const useApp = create<AppState>((set, get) => ({
     if (f.type === 'insertBefore') {
       const parents = s.edges.filter((e) => e.target === anchor.id).map((e) => s.nodes.find((n) => n.id === e.source)!).filter(Boolean)
       const p = avgPos(parents.length ? parents : [anchor])
-      const pos = { x: (p.x + anchor.position.x) / 2, y: (p.y + anchor.position.y) / 2 + 110 }
+      const tooClose = parents.length > 0 && Math.abs(anchor.position.x - p.x) < 220
+      const pos = parents.length
+        ? { x: (p.x + anchor.position.x) / 2, y: (p.y + anchor.position.y) / 2 + (tooClose ? 125 : 0) }
+        : { x: anchor.position.x - 240, y: anchor.position.y }
       const n: SNode = { id, type: 'sim', position: pos, data: { kind: f.kind, label: CATALOG[f.kind].label, config: cfg } }
       const edges = s.edges.map((e) => (e.target === anchor.id ? { ...e, target: id } : e))
       edges.push({ id: uid('e'), source: id, target: anchor.id, type: 'sim', data: { ...DEFAULT_EDGE } } as SEdge)
@@ -482,7 +514,10 @@ export const useApp = create<AppState>((set, get) => ({
     } else {
       const kids = s.edges.filter((e) => e.source === anchor.id).map((e) => s.nodes.find((n) => n.id === e.target)!).filter(Boolean)
       const k = avgPos(kids.length ? kids : [anchor])
-      const pos = { x: (k.x + anchor.position.x) / 2, y: (k.y + anchor.position.y) / 2 - 110 }
+      const tooClose = kids.length > 0 && Math.abs(k.x - anchor.position.x) < 220
+      const pos = kids.length
+        ? { x: (k.x + anchor.position.x) / 2, y: (k.y + anchor.position.y) / 2 - (tooClose ? 125 : 0) }
+        : { x: anchor.position.x + 240, y: anchor.position.y }
       const n: SNode = { id, type: 'sim', position: pos, data: { kind: f.kind, label: CATALOG[f.kind].label, config: cfg } }
       const edges = s.edges.map((e) => (e.source === anchor.id ? { ...e, source: id } : e))
       edges.push({ id: uid('e'), source: anchor.id, target: id, type: 'sim', data: { ...DEFAULT_EDGE } } as SEdge)
@@ -788,11 +823,13 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined
 useApp.subscribe((s, prev) => {
   if (s.nodes === prev.nodes && s.edges === prev.edges && s.notes === prev.notes && s.title === prev.title && s.challengeId === prev.challengeId) return
   clearTimeout(saveTimer)
+  if (s.saveStatus !== 'saving') useApp.setState({ saveStatus: 'saving' })
   saveTimer = setTimeout(() => {
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(serialize(useApp.getState())))
+      useApp.setState({ saveStatus: 'saved' })
     } catch {
-      /* storage unavailable */
+      useApp.setState({ saveStatus: 'error' })
     }
   }, 600)
 })

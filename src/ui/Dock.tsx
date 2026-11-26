@@ -73,6 +73,8 @@ function Metric({ label, value, sub, bad, children }: { label: string; value: st
 export function Dock() {
   const tab = useApp((s) => s.dockTab)
   const setTab = useApp((s) => s.setDockTab)
+  const dockOpen = useApp((s) => s.dockOpen)
+  const toggleDock = useApp((s) => s.toggleDock)
   const advice = useSim((s) => s.advice)
   const chaos = useApp((s) => s.chaos)
   const challengeId = useApp((s) => s.challengeId)
@@ -94,26 +96,56 @@ export function Dock() {
     { id: 'estimate', label: 'Estimate' },
     { id: 'practice', label: 'Practice', badge: interview && !interview.finishedAt ? 'live' : undefined, tone: 'live' },
   ]
+  const onTabKey = (e: React.KeyboardEvent, idx: number) => {
+    const move = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : e.key === 'Home' ? -idx : e.key === 'End' ? tabs.length - 1 - idx : 0
+    if (!move && e.key !== 'Home' && e.key !== 'End') return
+    e.preventDefault()
+    const next = (idx + move + tabs.length) % tabs.length
+    setTab(tabs[next].id)
+    if (!dockOpen) toggleDock()
+    document.getElementById(`dock-tab-${tabs[next].id}`)?.focus()
+  }
   return (
     <section className="dock">
-      <div className="dock-tabs" role="tablist">
-        {tabs.map((t) => (
-          <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-            {t.label}
-            {t.badge !== undefined && <span className={`badge ${t.tone}`}>{t.badge}</span>}
-          </button>
-        ))}
+      <div className="dock-head">
+        <div className="dock-tabs" role="tablist" aria-label="Analysis and tools">
+          {tabs.map((t, idx) => (
+            <button
+              key={t.id}
+              id={`dock-tab-${t.id}`}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              aria-controls={`dock-panel-${t.id}`}
+              tabIndex={tab === t.id ? 0 : -1}
+              className={tab === t.id ? 'on' : ''}
+              onClick={() => {
+                setTab(t.id)
+                if (!dockOpen) toggleDock()
+              }}
+              onKeyDown={(e) => onTabKey(e, idx)}
+            >
+              {t.label}
+              {t.badge !== undefined && <span className={`badge ${t.tone}`}>{t.badge}</span>}
+            </button>
+          ))}
+        </div>
+        <button type="button" className="iconbtn small" onClick={toggleDock} title="Toggle bottom panel (\)" aria-label={dockOpen ? 'Collapse bottom panel' : 'Expand bottom panel'}>
+          {dockOpen ? '▾' : '▴'}
+        </button>
       </div>
-      <div className="dock-body" key={tab}>
-        {tab === 'advisor' && <AdvisorPanel />}
-        {tab === 'cost' && <CostPanel />}
-        {tab === 'chaos' && <ChaosPanel />}
-        {tab === 'challenge' && <ChallengePanel />}
-        {tab === 'tests' && <TestsPanel />}
-        {tab === 'compare' && <ComparePanel />}
-        {tab === 'estimate' && <EstimatePanel />}
-        {tab === 'practice' && <PracticePanel />}
-      </div>
+      {dockOpen && (
+        <div className="dock-body" key={tab} id={`dock-panel-${tab}`} role="tabpanel" aria-labelledby={`dock-tab-${tab}`}>
+          {tab === 'advisor' && <AdvisorPanel />}
+          {tab === 'cost' && <CostPanel />}
+          {tab === 'chaos' && <ChaosPanel />}
+          {tab === 'challenge' && <ChallengePanel />}
+          {tab === 'tests' && <TestsPanel />}
+          {tab === 'compare' && <ComparePanel />}
+          {tab === 'estimate' && <EstimatePanel />}
+          {tab === 'practice' && <PracticePanel />}
+        </div>
+      )}
     </section>
   )
 }
@@ -294,7 +326,7 @@ function ChallengePanel() {
   const guide = useApp((s) => s.guide)
   const ch = CHALLENGES.find((c) => c.id === challengeId)
   if (!ch) return <ChallengeList />
-  return guide ? <GuidePanel /> : <ActiveChallenge />
+  return guide ? <GuidePanel /> : <ActiveChallenge key={ch.id} />
 }
 
 function ChallengeList() {
@@ -484,6 +516,10 @@ function DayTestPanel() {
 }
 
 function DayChart({ report }: { report: NonNullable<ReturnType<typeof useApp.getState>['dayReport']> }) {
+  const setTime = useApp((s) => s.setTime)
+  const time = useApp((s) => s.time)
+  const showToast = useApp((s) => s.showToast)
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const W = 640
   const H = 150
   const pad = { l: 36, r: 36, t: 10, b: 20 }
@@ -495,21 +531,40 @@ function DayChart({ report }: { report: NonNullable<ReturnType<typeof useApp.get
   const x = (i: number) => pad.l + (i / 23) * iw
   const bw = iw / 24 - 3
   const pLine = hrs.map((h, i) => `${x(i)},${pad.t + ih - (h.p99 / maxP) * ih}`).join(' ')
+  const hov = hoverIdx !== null ? hrs[hoverIdx] : null
+  const jumpHour = (hour: number) => {
+    const dayStart = Math.floor(time / 86400) * 86400
+    setTime(dayStart + hour * 3600)
+    showToast(`Jumped clock to ${fmtClock(hour * 3600)}`)
+  }
   return (
     <div className="daychart">
-      <div className="legend small">
-        <span><i style={{ background: 'color-mix(in srgb, var(--blue) 30%, transparent)' }} />Busiest minute each hour</span>
-        <span><i style={{ background: 'var(--ink)' }} />p99 latency</span>
-        <span><i style={{ background: 'var(--red)' }} />Hours with errors</span>
+      <div className="chart-head">
+        <div className="legend small">
+          <span><i style={{ background: 'color-mix(in srgb, var(--blue) 30%, transparent)' }} />Busiest minute each hour</span>
+          <span><i style={{ background: 'var(--ink)' }} />p99 latency</span>
+          <span><i style={{ background: 'var(--red)' }} />Hours with errors</span>
+        </div>
+        <div className="chart-tip">
+          {hov
+            ? `${fmtClock(hov.hour * 3600)} · ${fmtNum(hov.offered)}/s · ${fmtPct(hov.availability, 2)} ok · p99 ${fmtMs(hov.p99)} · ${fmtMoney(hov.cost)}/mo`
+            : 'Click any hour bar to jump the clock there'}
+        </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Traffic and latency over 24 hours">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Traffic and latency over 24 hours" onMouseLeave={() => setHoverIdx(null)}>
         {[0, 0.5, 1].map((g) => (
           <line key={g} className="gridl" x1={pad.l} x2={W - pad.r} y1={pad.t + ih * g} y2={pad.t + ih * g} strokeWidth="1" />
         ))}
         {hrs.map((h, i) => {
           const bh = (h.offered / maxR) * ih
           return (
-            <g key={i}>
+            <g
+              key={i}
+              className="bar-hit"
+              onMouseEnter={() => setHoverIdx(i)}
+              onClick={() => jumpHour(h.hour)}
+            >
+              <rect x={x(i) - bw / 2} y={pad.t} width={bw} height={ih} fill="transparent" />
               <rect x={x(i) - bw / 2} y={pad.t + ih - bh} width={bw} height={bh} rx="2" className={h.availability < 0.999 ? 'bar err' : 'bar'}>
                 <title>{`${String(h.hour).padStart(2, '0')}:00: ${fmtNum(h.offered)}/s at peak, ${fmtPct(h.availability, 2)} ok, p99 ${fmtMs(h.p99)}`}</title>
               </rect>
@@ -517,7 +572,7 @@ function DayChart({ report }: { report: NonNullable<ReturnType<typeof useApp.get
             </g>
           )
         })}
-        <polyline className="p99" points={pLine} fill="none" strokeWidth="1.8" strokeLinejoin="round" />
+        <polyline className="p99" points={pLine} fill="none" strokeWidth="1.8" strokeLinejoin="round" style={{ pointerEvents: 'none' }} />
         <text x={4} y={pad.t + 8} fontSize="10">{fmtNum(maxR)}/s</text>
         <text x={W - 4} y={pad.t + 8} fontSize="10" textAnchor="end">{fmtMs(maxP)}</text>
       </svg>

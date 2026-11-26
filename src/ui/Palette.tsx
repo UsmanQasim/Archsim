@@ -7,6 +7,7 @@ import { KindIcon } from './Icon'
 export function Palette() {
   const addNode = useApp((s) => s.addNode)
   const provider = useApp((s) => s.provider)
+  const togglePalette = useApp((s) => s.togglePalette)
   const [q, setQ] = useState('')
   const [closed, setClosed] = useState<Record<string, boolean>>({})
   const query = q.trim().toLowerCase()
@@ -14,9 +15,14 @@ export function Palette() {
     (d) => !query || `${d.label} ${d.desc} ${Object.values(d.providers).join(' ')}`.toLowerCase().includes(query),
   )
   return (
-    <aside className="palette">
-      <div className="panel-title">Components <span className="count">{KIND_ORDER.length}</span></div>
-      <input className="search" placeholder="Search, e.g. Lambda or Spanner" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search components" />
+    <aside className="palette" aria-label="Component palette">
+      <div className="panel-head">
+        <div className="panel-title">Components <span className="count">{KIND_ORDER.length}</span></div>
+        <button type="button" className="iconbtn" onClick={togglePalette} title="Hide components ([)" aria-label="Hide components panel">«</button>
+      </div>
+      <search className="search-box">
+        <input className="search" type="search" placeholder="Search, e.g. Lambda or Spanner" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search components" />
+      </search>
       <div className="palette-scroll">
         {CATEGORIES.map((cat) => {
           const list = items.filter((d) => d.category === cat)

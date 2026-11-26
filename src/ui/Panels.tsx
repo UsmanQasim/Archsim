@@ -42,6 +42,7 @@ export function LimitPanel() {
 
 function LimitChart() {
   const report = useApp((s) => s.limitReport)!
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const pts = report.points
   const W = 640
   const H = 160
@@ -52,19 +53,28 @@ function LimitChart() {
   const x = (i: number) => pad.l + (pts.length > 1 ? (i / (pts.length - 1)) * iw : iw / 2)
   const yA = (a: number) => pad.t + ih - Math.max(0, (a - 0.9) / 0.1) * ih
   const yP = (p: number) => pad.t + ih - (Math.min(p, 5000) / maxP) * ih
+  const hov = hoverIdx !== null ? pts[hoverIdx] : null
   return (
     <div className="daychart">
-      <div className="legend small">
-        <span><i style={{ background: 'var(--green)' }} />Requests that succeed (90–100 %)</span>
-        <span><i style={{ background: 'var(--ink)' }} />p99 latency</span>
+      <div className="chart-head">
+        <div className="legend small">
+          <span><i style={{ background: 'var(--green)' }} />Requests that succeed (90–100 %)</span>
+          <span><i style={{ background: 'var(--ink)' }} />p99 latency</span>
+        </div>
+        <div className="chart-tip">
+          {hov
+            ? `×${hov.mult}: ${fmtNum(hov.offered)} req/s · ${fmtPct(hov.availability, 2)} ok · p99 ${fmtMs(hov.p99)} · ${fmtMoney(hov.cost)}/mo`
+            : 'Hover a multiplier point for details'}
+        </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Availability and latency as traffic increases">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Availability and latency as traffic increases" onMouseLeave={() => setHoverIdx(null)}>
         {[0, 0.5, 1].map((g) => <line key={g} className="gridl" x1={pad.l} x2={W - pad.r} y1={pad.t + ih * g} y2={pad.t + ih * g} />)}
         <polyline points={pts.map((p, i) => `${x(i)},${yA(p.availability)}`).join(' ')} fill="none" style={{ stroke: 'var(--green)' }} strokeWidth="2" strokeLinejoin="round" />
         <polyline className="p99" points={pts.map((p, i) => `${x(i)},${yP(p.p99)}`).join(' ')} fill="none" strokeWidth="2" strokeLinejoin="round" />
         {pts.map((p, i) => (
-          <g key={p.mult}>
-            <circle cx={x(i)} cy={yA(p.availability)} r="3.5" style={{ fill: report.breakAt === p.mult ? 'var(--red)' : 'var(--green)' }}>
+          <g key={p.mult} onMouseEnter={() => setHoverIdx(i)} style={{ cursor: 'crosshair' }}>
+            <rect x={x(i) - 14} y={pad.t} width={28} height={ih} fill="transparent" />
+            <circle cx={x(i)} cy={yA(p.availability)} r={hoverIdx === i ? 5 : 3.5} style={{ fill: report.breakAt === p.mult ? 'var(--red)' : 'var(--green)' }}>
               <title>{`×${p.mult}: ${fmtNum(p.offered)} req/s, ${fmtPct(p.availability, 2)} succeed, p99 ${fmtMs(p.p99)}, ${fmtMoney(p.cost)}/mo`}</title>
             </circle>
             <text x={x(i)} y={H - 6} fontSize="10.5" textAnchor="middle">×{p.mult}</text>
@@ -142,6 +152,7 @@ export function GrowthPanel() {
 }
 
 function GrowthChart({ report }: { report: GrowthReport }) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const ms = report.months
   const W = 640
   const H = 160
@@ -154,18 +165,27 @@ function GrowthChart({ report }: { report: GrowthReport }) {
   const bw = iw / ms.length - 6
   const yC = (c: number) => pad.t + ih - (c / maxC) * ih
   const yP = (p: number) => pad.t + ih - (Math.min(p, 5000) / maxP) * ih
+  const hov = hoverIdx !== null ? ms[hoverIdx] : null
   return (
     <div className="daychart">
-      <div className="legend small">
-        <span><i style={{ background: 'color-mix(in srgb, var(--amber) 45%, transparent)' }} />Monthly bill</span>
-        <span><i style={{ background: 'var(--ink)' }} />p99 latency</span>
-        <span><i style={{ background: 'var(--red)' }} />Misses the targets</span>
-        {report.budget !== null && <span><i className="dash" />Budget</span>}
+      <div className="chart-head">
+        <div className="legend small">
+          <span><i style={{ background: 'color-mix(in srgb, var(--amber) 45%, transparent)' }} />Monthly bill</span>
+          <span><i style={{ background: 'var(--ink)' }} />p99 latency</span>
+          <span><i style={{ background: 'var(--red)' }} />Misses the targets</span>
+          {report.budget !== null && <span><i className="dash" />Budget</span>}
+        </div>
+        <div className="chart-tip">
+          {hov && hoverIdx !== null
+            ? `${MONTHS[hoverIdx]}: ${fmtNum(hov.offered)}/s (×${hov.mult.toFixed(2)}) · ${fmtPct(hov.availability, 2)} ok · p99 ${fmtMs(hov.p99)} · ${fmtMoney(hov.cost)}/mo`
+            : 'Hover a month bar for details'}
+        </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Cost and latency over the next 12 months">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Cost and latency over the next 12 months" onMouseLeave={() => setHoverIdx(null)}>
         {[0, 0.5, 1].map((g) => <line key={g} className="gridl" x1={pad.l} x2={W - pad.r} y1={pad.t + ih * g} y2={pad.t + ih * g} />)}
         {ms.map((m, i) => (
-          <g key={m.month}>
+          <g key={m.month} onMouseEnter={() => setHoverIdx(i)}>
+            <rect x={x(i) - bw / 2} y={pad.t} width={bw} height={ih} fill="transparent" />
             <rect x={x(i) - bw / 2} y={yC(m.cost)} width={bw} height={pad.t + ih - yC(m.cost)} rx="2" className={`gbar ${m.broken ? 'err' : ''} ${m.overBudget ? 'over' : ''}`}>
               <title>{`${MONTHS[i]}: ${fmtNum(m.offered)} req/s (×${m.mult.toFixed(2)}), ${fmtPct(m.availability, 2)} succeed, p99 ${fmtMs(m.p99)}, ${fmtMoney(m.cost)}/mo`}</title>
             </rect>
@@ -173,8 +193,8 @@ function GrowthChart({ report }: { report: GrowthReport }) {
           </g>
         ))}
         {report.budget !== null && <line className="budget" x1={pad.l - 6} x2={W - pad.r + 6} y1={yC(report.budget)} y2={yC(report.budget)} />}
-        <polyline className="p99" points={ms.map((m, i) => `${x(i)},${yP(m.p99)}`).join(' ')} fill="none" strokeWidth="2" strokeLinejoin="round" />
-        {ms.map((m, i) => m.broken && <circle key={i} cx={x(i)} cy={yP(m.p99)} r="3.5" style={{ fill: 'var(--red)' }} />)}
+        <polyline className="p99" points={ms.map((m, i) => `${x(i)},${yP(m.p99)}`).join(' ')} fill="none" strokeWidth="2" strokeLinejoin="round" style={{ pointerEvents: 'none' }} />
+        {ms.map((m, i) => m.broken && <circle key={i} cx={x(i)} cy={yP(m.p99)} r="3.5" style={{ fill: 'var(--red)', pointerEvents: 'none' }} />)}
         <text x={4} y={pad.t + 9} fontSize="10.5">{fmtMoney(maxC)}</text>
         <text x={4} y={pad.t + ih} fontSize="10.5">$0</text>
         <text x={W - 4} y={pad.t + 9} fontSize="10.5" textAnchor="end">{fmtMs(maxP)}</text>
@@ -193,7 +213,12 @@ export function ComparePanel() {
   const loadVariant = useApp((s) => s.loadVariant)
   const deleteVariant = useApp((s) => s.deleteVariant)
   const [name, setName] = useState('')
-  const now = useMemo(() => (nodes.length ? measure(nodes, edges) : null), [nodes, edges])
+  const sig = useMemo(
+    () => `${nodes.map((n) => `${n.id}:${n.data.label}:${JSON.stringify(n.data.config)}`).join('|')}#${edges.map((e) => `${e.id}:${e.source}->${e.target}:${JSON.stringify(e.data)}`).join('|')}`,
+    [nodes, edges],
+  )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const now = useMemo(() => (nodes.length ? measure(nodes, edges) : null), [sig])
   const rows = [
     ...(now ? [{ id: 'now', name: `${title} (on the board)`, m: now, current: true }] : []),
     ...variants.map((v) => ({ id: v.id, name: v.name, m: v.metrics, current: false })),
@@ -202,6 +227,16 @@ export function ComparePanel() {
     p99: Math.min(...rows.map((r) => r.m.p99)),
     cost: Math.min(...rows.map((r) => r.m.cost)),
     availability: Math.max(...rows.map((r) => r.m.availability)),
+  }
+  const fmtCostDelta = (c: number) => {
+    if (!now || Math.abs(c - now.cost) < 1) return null
+    const d = c - now.cost
+    return <span className={`delta ${d < 0 ? 'good' : 'bad'}`}>{d < 0 ? '−' : '+'}{fmtMoney(Math.abs(d))}</span>
+  }
+  const fmtLatDelta = (p: number) => {
+    if (!now || Math.abs(p - now.p99) < 1) return null
+    const d = p - now.p99
+    return <span className={`delta ${d < 0 ? 'good' : 'bad'}`}>{d < 0 ? '−' : '+'}{fmtMs(Math.abs(d))}</span>
   }
   return (
     <div className="compare">
@@ -219,16 +254,16 @@ export function ComparePanel() {
       <p className="muted small">Every version is measured the same way: at the daily peak, after autoscaling settles. Best value in each column is marked.</p>
       {rows.length > 1 ? (
         <table className="tbl compare-tbl">
-          <thead><tr><th>Version</th><th>Components</th><th>Avg</th><th>p99</th><th>Succeed</th><th>Cost / month</th><th>Busiest part</th><th></th></tr></thead>
+          <thead><tr><th>Version</th><th>Req/s</th><th>Avg</th><th>p99</th><th>Succeed</th><th>Cost / month</th><th>Busiest part</th><th></th></tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className={r.current ? 'current' : ''}>
                 <td className="ellip" title={r.name}><b>{r.name}</b></td>
-                <td>{r.m.nodes}</td>
+                <td>{fmtNum(r.m.rps)}/s</td>
                 <td>{fmtMs(r.m.avgLatency)}</td>
-                <td className={r.m.p99 === best.p99 ? 'best' : ''}>{fmtMs(r.m.p99)}</td>
+                <td className={r.m.p99 === best.p99 ? 'best' : ''}>{fmtMs(r.m.p99)}{!r.current && fmtLatDelta(r.m.p99)}</td>
                 <td className={r.m.availability === best.availability ? 'best' : r.m.availability < 0.999 ? 'bad' : ''}>{fmtPct(r.m.availability, 2)}</td>
-                <td className={r.m.cost === best.cost ? 'best' : ''}>{fmtMoney(r.m.cost)}</td>
+                <td className={r.m.cost === best.cost ? 'best' : ''}>{fmtMoney(r.m.cost)}{!r.current && fmtCostDelta(r.m.cost)}</td>
                 <td className="ellip">{r.m.bottleneck}</td>
                 <td>
                   {!r.current && (

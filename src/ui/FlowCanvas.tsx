@@ -4,6 +4,7 @@ import {
   type Connection, type Edge, type IsValidConnection, type NodeChange,
 } from '@xyflow/react'
 import { CATALOG } from '../sim/catalog'
+import { TEMPLATES } from '../sim/scenarios'
 import type { NodeKind } from '../sim/types'
 import { useApp, type NNode, type SEdge, type SNode } from '../store'
 import { NoteNode } from './NoteNode'
@@ -29,16 +30,17 @@ export function FlowCanvas() {
   const { screenToFlowPosition, fitView } = useReactFlow()
   const view = useApp((s) => s.view)
   const theme = useApp((s) => s.theme)
-  const title = useApp((s) => s.title)
   const count = useApp((s) => s.nodes.length)
   const fitTick = useApp((s) => s.fitTick)
+  const triggerFit = useApp((s) => s.triggerFit)
   const tidyLayout = useApp((s) => s.tidyLayout)
   const setQuickAdd = useApp((s) => s.setQuickAdd)
-  // re-frame smoothly when the pane resizes (view switch) or a different design loads
+  const loadTemplate = useApp((s) => s.loadTemplate)
+  // re-frame smoothly when the pane resizes (view switch) or a design loads/tidies
   useEffect(() => {
     const t = setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 350 }), 60)
     return () => clearTimeout(t)
-  }, [view, title, count, fitTick, fitView])
+  }, [view, fitTick, fitView])
 
   const isValidConnection: IsValidConnection<SEdge> = useCallback((c: Connection | Edge) => {
     if (c.source === c.target) return false
@@ -48,6 +50,13 @@ export function FlowCanvas() {
     if (!t || !s) return false
     if (t.data.kind === 'client') return false
     if (CATALOG[s.data.kind].terminal) return false
+    const reachable = (from: string, goal: string, seen = new Set<string>()): boolean => {
+      if (from === goal) return true
+      if (seen.has(from)) return false
+      seen.add(from)
+      return useApp.getState().edges.some((e) => e.source === from && reachable(e.target, goal, seen))
+    }
+    if (reachable(c.target, c.source)) return false
     return true
   }, [])
 
@@ -75,6 +84,7 @@ export function FlowCanvas() {
         onNodeDragStart={() => checkpoint('drag')}
         isValidConnection={isValidConnection}
         defaultEdgeOptions={{ type: 'sim' }}
+        connectionLineStyle={{ stroke: 'var(--blue)', strokeWidth: 2.2 }}
         deleteKeyCode={['Delete', 'Backspace']}
         snapToGrid
         snapGrid={[10, 10]}
@@ -95,8 +105,27 @@ export function FlowCanvas() {
             const p = screenToFlowPosition({ x: pane.left + 80, y: pane.top + 80 })
             addNote({ x: p.x, y: p.y })
           }} title="Add a sticky note to the board">Add note</button>
-          <button className="btn small" onClick={tidyLayout} disabled={!count} title="Line everything up left to right in the order requests flow">Tidy up</button>
+          <button type="button" className="btn small" onClick={tidyLayout} disabled={!count} title="Line everything up left to right in the order requests flow">Tidy up</button>
+          <button type="button" className="btn small" onClick={triggerFit} disabled={!count} title="Fit everything in view (F)">Fit</button>
         </Panel>
+        {!count && !notes.length && (
+          <Panel position="bottom-center" className="board-empty">
+            <span className="board-empty-kicker">Start a design</span>
+            <strong>Choose a working architecture</strong>
+            <div className="board-empty-actions">
+              {TEMPLATES.slice(1, 5).map((template) => (
+                <button key={template.id} onClick={() => loadTemplate(template.id)}>
+                  <span>{template.title.replace(/^\d+ · /, '')}</span>
+                  <small>{template.blurb}</small>
+                </button>
+              ))}
+              <button className="blank" onClick={() => setQuickAdd(true)}>
+                <span>Build from scratch</span>
+                <small>Search and add the first component</small>
+              </button>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   )

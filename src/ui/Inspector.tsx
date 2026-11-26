@@ -23,6 +23,7 @@ export function Inspector() {
 function Overview() {
   const nodes = useApp((s) => s.nodes)
   const select = useApp((s) => s.select)
+  const toggleInspector = useApp((s) => s.toggleInspector)
   const res = useSim((s) => s.result)
   const [showModel, setShowModel] = useState(false)
   if (!res) return null
@@ -31,11 +32,20 @@ function Overview() {
     .filter((n) => n.data.kind !== 'client')
     .map((n) => ({ n, c: res.nodes[n.id]?.cost ?? 0 }))
     .sort((a, b) => b.c - a.c)
+  const hotRows = nodes
+    .filter((n) => n.data.kind !== 'client')
+    .map((n) => ({ n, m: res.nodes[n.id] }))
+    .filter((x) => x.m && (x.m.inRead + x.m.inWrite > 0.01 || !x.m.healthy))
+    .sort((a, b) => (!a.m.healthy ? -1 : !b.m.healthy ? 1 : b.m.util - a.m.util))
+    .slice(0, 6)
   const maxC = Math.max(costRows[0]?.c ?? 0, T.egressCost) || 1
   const clients = nodes.filter((n) => n.data.kind === 'client')
   return (
     <div className="insp">
-      <div className="panel-title" style={{ paddingLeft: 0 }}>Your system</div>
+      <div className="insp-top">
+        <div className="panel-title">Your system</div>
+        <button type="button" className="iconbtn" onClick={toggleInspector} title="Hide inspector (])" aria-label="Hide inspector panel">»</button>
+      </div>
       <p className="muted small">Click any component or connection on the board to tune it. Numbers update as you change things.</p>
 
       {clients.length > 0 && (
@@ -56,6 +66,27 @@ function Overview() {
                   </tr>
                 )
               })}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {hotRows.length > 0 && (
+        <section>
+          <h4>Component health</h4>
+          <table className="tbl">
+            <thead><tr><th>Component</th><th>Load</th><th>Busy</th><th>Latency</th></tr></thead>
+            <tbody>
+              {hotRows.map(({ n, m }) => (
+                <tr key={n.id} onClick={() => select({ type: 'node', id: n.id })} className="clickable">
+                  <td className="ellip" title={n.data.label}>{n.data.label}</td>
+                  <td>{fmtNum(m.inRead + m.inWrite)}/s</td>
+                  <td className={!m.healthy || m.util > 1 ? 'bad' : m.util >= 0.85 ? 'warn-t' : 'ok'}>
+                    {!m.healthy ? 'Down' : fmtPct(m.util, 0)}
+                  </td>
+                  <td>{m.healthy ? fmtMs(m.latency) : '—'}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </section>

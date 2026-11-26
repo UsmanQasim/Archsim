@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Grid, Html, Line, OrbitControls, RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
@@ -283,7 +283,7 @@ function Shape({ n, instances, color, glow, gi, backlog }: { n: SNode; instances
 // ------------------------------------------------------------------ nodes
 const NO_UTIL = ['lb', 'gateway', 'waf', 'queue', 'pubsub', 'dns', 'cdn', 'edgefn', 'auth']
 
-function Node3D({ n }: { n: SNode }) {
+function Node3D({ n, showLabels }: { n: SNode; showLabels: boolean }) {
   const m = useSim((s) => s.result?.nodes[n.id])
   const failed = useApp((s) => s.chaos.failedNodes.includes(n.id) || (n.data.kind !== 'client' && n.data.config.region !== GLOBAL && s.chaos.failedRegions.includes(n.data.config.region)))
   const selected = useApp((s) => s.selection?.type === 'node' && s.selection.id === n.id)
@@ -343,12 +343,14 @@ function Node3D({ n }: { n: SNode }) {
         <ringGeometry args={[0.92, 1.05, 56]} />
         <meshBasicMaterial color={selected ? mk.ok : health} transparent opacity={selected ? 0.9 : idle ? 0.35 : 0.75} />
       </mesh>
-      <Html position={[0, 2.05, 0]} center distanceFactor={18} zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
-        <div className={`label3d ${failed ? 'down' : ''} ${selected ? 'sel' : ''}`} style={{ ['--h' as string]: failed ? 'var(--red)' : isClient ? 'var(--blue)' : utilColor(u, idle) }}>
-          <div className="l3-name">{n.data.label}</div>
-          <div className="l3-stats">{stats}</div>
-        </div>
-      </Html>
+      {showLabels && (
+        <Html position={[0, 2.05, 0]} center distanceFactor={18} zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
+          <div className={`label3d ${failed ? 'down' : ''} ${selected ? 'sel' : ''}`} style={{ ['--h' as string]: failed ? 'var(--red)' : isClient ? 'var(--blue)' : utilColor(u, idle) }}>
+            <div className="l3-name">{n.data.label}</div>
+            <div className="l3-stats">{stats}</div>
+          </div>
+        </Html>
+      )}
     </group>
   )
 }
@@ -434,7 +436,7 @@ function Edge3D({ e, a, b }: { e: SEdge; a: THREE.Vector3; b: THREE.Vector3 }) {
 // ------------------------------------------------------------------ regions: foam-board bases
 const REGION_COLORS = ['#2457c5', '#1e8a4c', '#7e57c2', '#b86e0a', '#1f8a80', '#a8418f', '#3d58b0', '#c0602b']
 
-function RegionPlatforms({ nodes }: { nodes: SNode[] }) {
+function RegionPlatforms({ nodes, showLabels }: { nodes: SNode[]; showLabels: boolean }) {
   const failedRegions = useApp((s) => s.chaos.failedRegions)
   const theme = useApp((s) => s.theme)
   const groups = useMemo(() => {
@@ -474,9 +476,11 @@ function RegionPlatforms({ nodes }: { nodes: SNode[] }) {
             <RoundedBox args={[w, h, d]} radius={Math.min(0.08, h / 2 - 0.001)} smoothness={3} receiveShadow castShadow={false}>
               <meshStandardMaterial color={tint} roughness={0.92} metalness={0} />
             </RoundedBox>
-            <Html position={[-w / 2 + 0.2, h / 2 + 0.02, d / 2 - 0.2]} distanceFactor={14} style={{ pointerEvents: 'none' }} zIndexRange={[10, 0]}>
-              <div className={`region3d ${down ? 'down' : ''}`}>{down ? `${g.name} is offline` : g.name}</div>
-            </Html>
+            {showLabels && (
+              <Html position={[-w / 2 + 0.2, h / 2 + 0.02, d / 2 - 0.2]} distanceFactor={14} style={{ pointerEvents: 'none' }} zIndexRange={[10, 0]}>
+                <div className={`region3d ${down ? 'down' : ''}`}>{down ? `${g.name} is offline` : g.name}</div>
+              </Html>
+            )}
           </group>
         )
       })}
@@ -534,10 +538,10 @@ function KeyLight({ center, span, intensity }: { center: THREE.Vector3; span: nu
   return <directionalLight ref={light} castShadow intensity={intensity} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-normalBias={0.02} />
 }
 
-function SceneContents() {
+function SceneContents({ showLabels }: { showLabels: boolean }) {
   const nodes = useApp((s) => s.nodes)
   const edges = useApp((s) => s.edges)
-  const title = useApp((s) => s.title)
+  const fitTick = useApp((s) => s.fitTick)
   const select = useApp((s) => s.select)
   const theme = useApp((s) => s.theme)
   const pos = useMemo(() => new Map(nodes.map((n) => [n.id, new THREE.Vector3(...to3(n))])), [nodes])
@@ -548,7 +552,7 @@ function SceneContents() {
     const c = new THREE.Vector3((Math.min(...xs) + Math.max(...xs)) / 2, 0, (Math.min(...zs) + Math.max(...zs)) / 2)
     return { center: c, span: Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) + 4 }
   }, [nodes])
-  const fitKey = `${title}:${nodes.length > 0 ? nodes[0].id : ''}:${nodes.length}`
+  const fitKey = String(fitTick)
   const light = theme === 'light'
   const table = light ? '#eceeea' : '#1a1d20'
   return (
@@ -562,13 +566,13 @@ function SceneContents() {
         <meshStandardMaterial color={table} roughness={1} metalness={0} />
       </mesh>
       <Grid args={[300, 300]} cellSize={1} cellThickness={0.6} cellColor={light ? '#dde1dc' : '#262a2e'} sectionSize={5} sectionThickness={1} sectionColor={light ? '#d0d6d1' : '#30353a'} fadeDistance={90} fadeStrength={1.6} infiniteGrid position={[0, -0.2, 0]} />
-      <RegionPlatforms nodes={nodes} />
+      <RegionPlatforms nodes={nodes} showLabels={showLabels} />
       {edges.map((e) => {
         const a = pos.get(e.source)
         const b = pos.get(e.target)
         return a && b ? <Edge3D key={e.id} e={e} a={a} b={b} /> : null
       })}
-      {nodes.map((n) => <Node3D key={n.id} n={n} />)}
+      {nodes.map((n) => <Node3D key={n.id} n={n} showLabels={showLabels} />)}
       <OrbitControls makeDefault enableDamping dampingFactor={0.1} maxPolarAngle={Math.PI / 2.15} minDistance={4} maxDistance={160} />
       <CameraRig center={center} span={span} fitKey={fitKey} />
     </>
@@ -576,12 +580,26 @@ function SceneContents() {
 }
 
 export function Scene3D() {
+  const [showLabels, setShowLabels] = useState(true)
+  const triggerFit = useApp((s) => s.triggerFit)
+  const count = useApp((s) => s.nodes.length)
   return (
     <div className="scene-wrap">
+      <div className="scene-tools">
+        <button type="button" className="btn small" onClick={triggerFit} disabled={!count} title="Reset 3D camera (F)">Reset view</button>
+        <button type="button" className="btn small" onClick={() => setShowLabels((v) => !v)} aria-pressed={showLabels}>
+          {showLabels ? 'Hide labels' : 'Show labels'}
+        </button>
+      </div>
       <Canvas shadows flat dpr={[1, 2]} camera={{ fov: 40, position: [0, 18, 24], near: 0.1, far: 500 }} gl={{ antialias: true }}>
-        <SceneContents />
+        <SceneContents showLabels={showLabels} />
       </Canvas>
-      <div className="scene-hint">Drag to turn the model, right-drag to move it, scroll to zoom, click a piece to inspect it.</div>
+      <div className="scene-hint">Drag to turn, right-drag to pan, scroll to zoom, click a piece to inspect.</div>
+      <div className="scene-legend" aria-hidden="true">
+        <span><i style={{ background: 'var(--green)' }} />Healthy</span>
+        <span><i style={{ background: 'var(--amber)' }} />Busy</span>
+        <span><i style={{ background: 'var(--red)' }} />Hot / Down</span>
+      </div>
     </div>
   )
 }

@@ -55,7 +55,15 @@ function useShortcuts() {
         s.setHelp(false)
       } else if (!mod && (e.key === '1' || e.key === '2' || e.key === '3' || e.key === '4')) {
         s.setView(e.key === '1' ? '2d' : e.key === '2' ? 'split' : e.key === '3' ? '3d' : 'map')
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && s.view === '3d' && s.selection) {
+      } else if (!mod && key === 'f') {
+        s.triggerFit()
+      } else if (!mod && e.key === '[') {
+        s.togglePalette()
+      } else if (!mod && e.key === ']') {
+        s.toggleInspector()
+      } else if (!mod && e.key === '\\') {
+        s.toggleDock()
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && (s.view === '3d' || s.view === 'map') && s.selection) {
         if (s.selection.type === 'node') s.removeNode(s.selection.id)
         else s.removeEdge(s.selection.id)
       }
@@ -113,6 +121,11 @@ export default function App() {
   const view = useApp((s) => s.view)
   const toast = useApp((s) => s.toast)
   const theme = useApp((s) => s.theme)
+  const paletteOpen = useApp((s) => s.paletteOpen)
+  const inspectorOpen = useApp((s) => s.inspectorOpen)
+  const dockOpen = useApp((s) => s.dockOpen)
+  const togglePalette = useApp((s) => s.togglePalette)
+  const toggleInspector = useApp((s) => s.toggleInspector)
   const dock = useDockHeight()
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -131,13 +144,33 @@ export default function App() {
     return startSimLoop()
   }, [])
 
+  const bottomH = dockOpen ? dock.h : 66
+
   return (
     <ReactFlowProvider>
-      <div className="app" style={{ gridTemplateRows: `52px minmax(0, 1fr) ${dock.h}px` }}>
+      <div
+        className="app"
+        style={{
+          gridTemplateRows: `52px minmax(0, 1fr) ${bottomH}px`,
+          ['--dock-h' as string]: `${bottomH}px`,
+          ['--pal-w' as string]: paletteOpen ? undefined : '0px',
+          ['--insp-w' as string]: inspectorOpen ? undefined : '0px',
+        }}
+      >
         <Topbar />
         <div className="main">
-          <Palette />
-          <div className={`stage view-${view}`}>
+          {paletteOpen ? <Palette /> : <div aria-hidden="true" />}
+          <main className={`stage view-${view}`}>
+            {!paletteOpen && (
+              <button type="button" className="panel-reopen left" onClick={togglePalette} title="Show components ([)" aria-label="Show components panel">
+                Components →
+              </button>
+            )}
+            {!inspectorOpen && (
+              <button type="button" className="panel-reopen right" onClick={toggleInspector} title="Show inspector (])" aria-label="Show inspector panel">
+                ← Inspector
+              </button>
+            )}
             {(view === '2d' || view === 'split') && (
               <div className="pane pane-2d">
                 <FlowCanvas />
@@ -153,29 +186,33 @@ export default function App() {
                 <Scene3D />
               </div>
             )}
-          </div>
-          <Inspector />
+          </main>
+          {inspectorOpen ? <Inspector /> : <div aria-hidden="true" />}
         </div>
-        <div className="app-bottom">
-          <div
-            className="dock-resizer"
-            role="separator"
-            aria-orientation="horizontal"
-            aria-label="Resize bottom panel"
-            tabIndex={0}
-            onPointerDown={dock.start}
-            onDoubleClick={() => dock.setH(dock.h > 320 ? 280 : 440)}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowUp') dock.setH(Math.min(window.innerHeight - 260, dock.h + 24))
-              if (e.key === 'ArrowDown') dock.setH(Math.max(180, dock.h - 24))
-            }}
-          />
+        <div className={`app-bottom ${dockOpen ? '' : 'is-collapsed'}`}>
+          {dockOpen && (
+            <div
+              className="dock-resizer"
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize bottom panel"
+              tabIndex={0}
+              onPointerDown={dock.start}
+              onDoubleClick={() => dock.setH(dock.h > 320 ? 280 : 440)}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowUp') dock.setH(Math.min(window.innerHeight - 260, dock.h + 24))
+                if (e.key === 'ArrowDown') dock.setH(Math.max(180, dock.h - 24))
+              }}
+            />
+          )}
           <MetricsStrip />
           <Dock />
         </div>
         <HelpModal />
         <QuickAdd />
-        {toast && <div className="toast" role="status">{toast}</div>}
+        <div className="toast-region" role="status" aria-live="polite" aria-atomic="true">
+          {toast && <div className="toast">{toast}</div>}
+        </div>
         <div className="small-screen">ArchSim is built for a laptop or desktop screen (1280 px+). Rotate or widen your window for the full editor.</div>
       </div>
     </ReactFlowProvider>
