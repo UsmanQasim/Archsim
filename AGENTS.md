@@ -27,7 +27,7 @@ ArchSim is a client-only React/Vite system design simulator. It models architect
 6. Prefer existing helpers such as `defaultConfig`, `CATALOG`, `TEMPLATES`, and `CHALLENGES`.
 7. For generated designs, produce valid ArchSim JSON with `v: 1`.
 8. Preserve JSON and share-link compatibility when changing serialization.
-9. Run `npm run build` after repository changes.
+9. Run `npm test` and `npm run build` after repository changes. The tests check that every challenge's reference solution still passes its own targets.
 
 ## Required architecture decision format
 

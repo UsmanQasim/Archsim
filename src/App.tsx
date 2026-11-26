@@ -1,15 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { initFromUrlOrStorage, useApp } from './store'
 import { startSimLoop } from './simLoop'
 import { Topbar, HelpModal } from './ui/Topbar'
 import { Palette } from './ui/Palette'
 import { FlowCanvas } from './ui/FlowCanvas'
-import { Scene3D } from './ui/Scene3D'
 import { Inspector } from './ui/Inspector'
 import { Dock, MetricsStrip } from './ui/Dock'
 import { QuickAdd } from './ui/QuickAdd'
-import { MapView } from './ui/MapView'
+import { getLayout, useDrawer, useLayout } from './layout'
+
+// the 3D model (three.js) and the world map are loaded only when first shown
+const Scene3D = lazy(() => import('./ui/Scene3D').then((m) => ({ default: m.Scene3D })))
+const MapView = lazy(() => import('./ui/MapView').then((m) => ({ default: m.MapView })))
 
 function useShortcuts() {
   useEffect(() => {
@@ -58,9 +61,11 @@ function useShortcuts() {
       } else if (!mod && key === 'f') {
         s.triggerFit()
       } else if (!mod && e.key === '[') {
-        s.togglePalette()
+        if (getLayout() === 'wide') s.togglePalette()
+        else useDrawer.getState().toggle('palette')
       } else if (!mod && e.key === ']') {
-        s.toggleInspector()
+        if (getLayout() === 'wide') s.toggleInspector()
+        else useDrawer.getState().toggle('inspector')
       } else if (!mod && e.key === '\\') {
         s.toggleDock()
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && (s.view === '3d' || s.view === 'map') && s.selection) {
@@ -81,6 +86,7 @@ function useDockHeight() {
     } catch {
       /* ignore */
     }
+    if (getLayout() === 'narrow') return Math.round(window.innerHeight * 0.36)
     return window.innerHeight < 820 ? 260 : 320
   })
   const drag = useRef<{ y: number; h: number } | null>(null)
@@ -127,6 +133,28 @@ export default function App() {
   const togglePalette = useApp((s) => s.togglePalette)
   const toggleInspector = useApp((s) => s.toggleInspector)
   const dock = useDockHeight()
+  const layout = useLayout()
+  const wide = layout === 'wide'
+  const drawer = useDrawer((s) => s.drawer)
+  const openDrawer = useDrawer((s) => s.open)
+  // on small screens the side panels slide in: open details when something is picked
+  useEffect(
+    () =>
+      useApp.subscribe((s, prev) => {
+        if (s.selection === prev.selection || getLayout() === 'wide') return
+        if (s.selection) openDrawer('inspector')
+        else if (useDrawer.getState().drawer === 'inspector') openDrawer(null)
+      }),
+    [openDrawer],
+  )
+  useEffect(() => {
+    if (layout === 'wide') openDrawer(null)
+    // side-by-side board and model needs a big screen
+    else if (useApp.getState().view === 'split') useApp.getState().setView('2d')
+  }, [layout, openDrawer])
+  useEffect(() => {
+    if (layout !== 'wide' && view === 'split') useApp.getState().setView('2d')
+  }, [layout, view])
   useEffect(() => {
     document.documentElement.dataset.theme = theme
   }, [theme])
@@ -143,42 +171,30 @@ export default function App() {
     }
     return startSimLoop()
   }, [])
-  useEffect(() => {
-    const compact = window.matchMedia('(max-width: 900px)')
-    const closeSidebarsOnCompact = () => {
-      if (!compact.matches) return
-      const state = useApp.getState()
-      if (state.paletteOpen) state.togglePalette()
-      if (state.inspectorOpen) state.toggleInspector()
-    }
-    closeSidebarsOnCompact()
-    compact.addEventListener('change', closeSidebarsOnCompact)
-    return () => compact.removeEventListener('change', closeSidebarsOnCompact)
-  }, [])
 
   const bottomH = dockOpen ? dock.h : 66
 
   return (
     <ReactFlowProvider>
       <div
-        className="app"
+        className={`app layout-${layout} ${drawer ? `drawer-${drawer}` : ''}`}
         style={{
           gridTemplateRows: 'auto minmax(0, 1fr) var(--dock-h)',
           ['--dock-h' as string]: `${bottomH}px`,
-          ['--pal-w' as string]: paletteOpen ? undefined : '0px',
-          ['--insp-w' as string]: inspectorOpen ? undefined : '0px',
+          ['--pal-w' as string]: !wide || paletteOpen ? undefined : '0px',
+          ['--insp-w' as string]: !wide || inspectorOpen ? undefined : '0px',
         }}
       >
         <Topbar />
         <div className="main">
-          {paletteOpen ? <Palette /> : <div aria-hidden="true" />}
+          {!wide || paletteOpen ? <Palette /> : <div aria-hidden="true" />}
           <main className={`stage view-${view}`}>
-            {!paletteOpen && (
+            {wide && !paletteOpen && (
               <button type="button" className="panel-reopen left" onClick={togglePalette} title="Show components ([)" aria-label="Show components panel">
                 Components →
               </button>
             )}
-            {!inspectorOpen && (
+            {wide && !inspectorOpen && (
               <button type="button" className="panel-reopen right" onClick={toggleInspector} title="Show inspector (])" aria-label="Show inspector panel">
                 ← Inspector
               </button>
@@ -190,16 +206,21 @@ export default function App() {
             )}
             {view === 'map' && (
               <div className="pane pane-map">
-                <MapView />
+                <Suspense fallback={<div className="pane-loading">Loading the map…</div>}>
+                  <MapView />
+                </Suspense>
               </div>
             )}
             {(view === '3d' || view === 'split') && (
               <div className="pane pane-3d">
-                <Scene3D />
+                <Suspense fallback={<div className="pane-loading">Loading the 3D model…</div>}>
+                  <Scene3D />
+                </Suspense>
               </div>
             )}
           </main>
-          {inspectorOpen ? <Inspector /> : <div aria-hidden="true" />}
+          {!wide || inspectorOpen ? <Inspector /> : <div aria-hidden="true" />}
+          {!wide && drawer && <div className="scrim" onClick={() => openDrawer(null)} aria-hidden />}
         </div>
         <div className={`app-bottom ${dockOpen ? '' : 'is-collapsed'}`}>
           {dockOpen && (

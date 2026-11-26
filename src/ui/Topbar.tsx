@@ -8,6 +8,7 @@ import { dayNumber, fmtClock } from '../format'
 import { useApp, type View } from '../store'
 import { PracticeTimer } from './Practice'
 import { exportBoardPng } from '../exportImage'
+import { useDrawer } from '../layout'
 
 const Chevron = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ marginLeft: 4, verticalAlign: -1 }}>
@@ -20,28 +21,28 @@ const Ico = ({ d, size = 18 }: { d: string; size?: number }) => (
   </svg>
 )
 
-function Menu({ label, children, wide }: { label: string; children: (close: () => void) => ReactNode; wide?: boolean }) {
+function Menu({ label, children, wide, className, icon }: { label: string; children: (close: () => void) => ReactNode; wide?: boolean; className?: string; icon?: ReactNode }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (!open) return
-    const h = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
+    const h = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
     const k = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setOpen(false)
         triggerRef.current?.focus()
       }
     }
-    window.addEventListener('mousedown', h)
+    window.addEventListener('pointerdown', h)
     window.addEventListener('keydown', k)
     return () => {
-      window.removeEventListener('mousedown', h)
+      window.removeEventListener('pointerdown', h)
       window.removeEventListener('keydown', k)
     }
   }, [open])
   return (
-    <div className="menu" ref={ref}>
+    <div className={`menu ${className ?? ''}`} ref={ref}>
       <button
         ref={triggerRef}
         type="button"
@@ -49,8 +50,10 @@ function Menu({ label, children, wide }: { label: string; children: (close: () =
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="true"
+        aria-label={icon ? label : undefined}
+        title={icon ? label : undefined}
       >
-        {label}<Chevron />
+        {icon ?? <>{label}<Chevron /></>}
       </button>
       {open && <div className={`menu-pop ${wide ? 'wide' : ''}`}>{children(() => setOpen(false))}</div>}
     </div>
@@ -94,11 +97,16 @@ export function Topbar() {
   const theme = useApp((s) => s.theme)
   const toggleTheme = useApp((s) => s.toggleTheme)
   const fileRef = useRef<HTMLInputElement>(null)
+  const drawer = useDrawer((s) => s.drawer)
+  const toggleDrawer = useDrawer((s) => s.toggle)
   const tod = ((time % 86400) + 86400) % 86400
   const load = patternFactor('daily', tod)
 
   return (
     <header className="topbar">
+      <button className={`tbtn only-compact ${drawer === 'palette' ? 'on' : ''}`} onClick={() => toggleDrawer('palette')} aria-label="Components" title="Components" aria-expanded={drawer === 'palette'}>
+        <Ico d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM17 14v6M14 17h6" />
+      </button>
       <div className="brand">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <rect x="3" y="4" width="6" height="5" rx="1.5" />
@@ -110,16 +118,13 @@ export function Topbar() {
       </div>
       <div className="title-wrap">
         <input className="title-input" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Design title" />
-        <span className={`save-dot ${saveStatus === 'saving' ? 'saving' : ''}`} title={saveStatus === 'saving' ? 'Saving to browser storage…' : 'Saved locally'}>
-          {saveStatus === 'saving' ? 'Saving…' : 'Saved'}
-        </span>
       </div>
       <span className={`save-status ${saveStatus}`} role="status" aria-live="polite" title={saveStatus === 'error' ? 'Local saving is unavailable' : 'Changes are saved in this browser'}>
         <i aria-hidden />
         {saveStatus === 'saving' ? 'Saving' : saveStatus === 'error' ? 'Not saved' : 'Saved'}
       </span>
 
-      <Menu label="Templates">
+      <Menu label="Templates" className="hide-narrow">
         {(close) => TEMPLATES.map((t) => (
           <button key={t.id} className="menu-item" onClick={() => { loadTemplate(t.id); close() }}>
             <b>{t.title}</b>
@@ -127,7 +132,7 @@ export function Topbar() {
           </button>
         ))}
       </Menu>
-      <Menu label="Challenges" wide>
+      <Menu label="Challenges" wide className="hide-narrow">
         {(close) => [
           <div key="_progress" className="menu-progress small">{CHALLENGES.filter((c) => passed[c.id]).length} of {CHALLENGES.length} passed</div>,
           ...CHALLENGES.map((c) => (
@@ -144,11 +149,11 @@ export function Topbar() {
 
       <div className="seg view-seg" role="group" aria-label="View">
         {(['2d', 'split', '3d', 'map'] as View[]).map((v) => (
-          <button key={v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>{v === '2d' ? 'Board' : v === '3d' ? 'Model' : v === 'map' ? 'Map' : 'Both'}</button>
+          <button key={v} className={`${view === v ? 'on' : ''} ${v === 'split' ? 'hide-compact' : ''}`} onClick={() => setView(v)}>{v === '2d' ? 'Board' : v === '3d' ? 'Model' : v === 'map' ? 'Map' : 'Both'}</button>
         ))}
       </div>
 
-      <select className="provider" value={provider} onChange={(e) => setProvider(e.target.value as Provider)} aria-label="Cloud provider naming" title="Show product names for this cloud">
+      <select className="provider hide-narrow hide-mid" value={provider} onChange={(e) => setProvider(e.target.value as Provider)} aria-label="Cloud provider naming" title="Show product names for this cloud">
         {PROVIDERS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
       </select>
 
@@ -179,16 +184,19 @@ export function Topbar() {
             <span style={{ width: `${Math.round(load * 100)}%` }} />
           </div>
         </div>
-        <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Simulation speed">
+        <select className="hide-narrow hide-mid" value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Simulation speed">
           {SPEEDS.map((s) => <option key={s.v} value={s.v}>{s.l}</option>)}
         </select>
       </div>
 
       <div className="tools">
         <PracticeTimer />
-        <button className="tbtn" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" aria-label="Undo"><Ico d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></button>
-        <button className="tbtn" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><Ico d="m15 14 5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></button>
-        <Menu label="File">
+        <button className={`tbtn only-compact ${drawer === 'inspector' ? 'on' : ''}`} onClick={() => toggleDrawer('inspector')} aria-label="Details" title="Details of the selected part" aria-expanded={drawer === 'inspector'}>
+          <Ico d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4" />
+        </button>
+        <button className="tbtn hide-narrow" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" aria-label="Undo"><Ico d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></button>
+        <button className="tbtn hide-narrow" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><Ico d="m15 14 5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></button>
+        <Menu label="File" className="hide-narrow hide-sm">
           {(close) => (
             <>
               <button className="menu-item" onClick={() => { shareLink(); close() }}><b>Copy share link</b><span>The whole design fits in the link. No account needed.</span></button>
@@ -200,10 +208,11 @@ export function Topbar() {
             </>
           )}
         </Menu>
-        <button className="tbtn" onClick={toggleTheme} aria-label={theme === 'light' ? 'Switch to night mode' : 'Switch to day mode'} title={theme === 'light' ? 'Night mode' : 'Day mode'}>
+        <button className="tbtn hide-narrow hide-mid" onClick={toggleTheme} aria-label={theme === 'light' ? 'Switch to night mode' : 'Switch to day mode'} title={theme === 'light' ? 'Night mode' : 'Day mode'}>
           {theme === 'light' ? <Ico d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" /> : <Ico d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />}
         </button>
-        <button className="tbtn" onClick={() => setHelp(true)} aria-label="Help" title="How to use ArchSim"><Ico d="M9.2 9a3 3 0 0 1 5.6 1.2c0 2-2.8 2.4-2.8 4.3M12 17.6v.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" /></button>
+        <MoreMenu onImport={() => fileRef.current?.click()} />
+        <button className="tbtn hide-narrow hide-mid" onClick={() => setHelp(true)} aria-label="Help" title="How to use ArchSim"><Ico d="M9.2 9a3 3 0 0 1 5.6 1.2c0 2-2.8 2.4-2.8 4.3M12 17.6v.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" /></button>
         <input
           ref={fileRef}
           type="file"
@@ -217,6 +226,60 @@ export function Topbar() {
         />
       </div>
     </header>
+  )
+}
+
+/** Phone menu: everything the top bar hides on small screens, one level deep. */
+function MoreMenu({ onImport }: { onImport: () => void }) {
+  const [sub, setSub] = useState<'root' | 'templates' | 'challenges' | 'file'>('root')
+  const s = useApp()
+  const back = <button className="menu-back" onClick={() => setSub('root')}><Chevron /> Back</button>
+  return (
+    <Menu label="More" className="only-mid menu-more" icon={<Ico d="M4 7h16M4 12h16M4 17h16" />}>
+      {(close) => {
+        const done = () => { setSub('root'); close() }
+        if (sub === 'templates') return <>{back}{TEMPLATES.map((t) => <button key={t.id} className="menu-item" onClick={() => { s.loadTemplate(t.id); done() }}><b>{t.title}</b><span>{t.blurb}</span></button>)}</>
+        if (sub === 'challenges') return <>{back}{CHALLENGES.map((c) => (
+          <div key={c.id} className="menu-row">
+            <button className="menu-item" onClick={() => { s.startChallenge(c.id); done() }}><b>{c.title} <em className={`diff d-${c.difficulty}`}>{c.difficulty}</em>{s.passed[c.id] && <em className="passed-tag">passed</em>}</b></button>
+            <button className="tbtn small" onClick={() => { s.startGuide(c.id); done() }}>Solution</button>
+          </div>
+        ))}</>
+        if (sub === 'file') return <>{back}
+          <button className="menu-item" onClick={() => { s.shareLink(); done() }}><b>Copy share link</b></button>
+          <button className="menu-item" onClick={() => { downloadDesignDoc(); done() }}><b>Download design doc</b></button>
+          <button className="menu-item" onClick={() => { exportBoardPng(); done() }}><b>Save board as image</b></button>
+          <button className="menu-item" onClick={() => { s.exportJson(); done() }}><b>Export JSON</b></button>
+          <button className="menu-item" onClick={() => { onImport(); done() }}><b>Import JSON</b></button>
+        </>
+        return (
+          <>
+            <button className="menu-item nav" onClick={() => setSub('templates')}><b>Templates</b></button>
+            <button className="menu-item nav" onClick={() => setSub('challenges')}><b>Challenges</b><span>{CHALLENGES.filter((c) => s.passed[c.id]).length} of {CHALLENGES.length} passed</span></button>
+            <button className="menu-item nav" onClick={() => setSub('file')}><b>File</b><span>Share, export, import</span></button>
+            <div className="menu-sep" />
+            <div className="menu-inline">
+              <button className="tbtn small" onClick={s.undo} disabled={!s.past.length}>Undo</button>
+              <button className="tbtn small" onClick={s.redo} disabled={!s.future.length}>Redo</button>
+              <button className="tbtn small" onClick={s.toggleTheme}>{s.theme === 'light' ? 'Night mode' : 'Day mode'}</button>
+              <button className="tbtn small" onClick={() => { s.setHelp(true); done() }}>Help</button>
+            </div>
+            <label className="menu-field">
+              <span>Cloud names</span>
+              <select value={s.provider} onChange={(e) => s.setProvider(e.target.value as Provider)}>
+                {PROVIDERS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+            </label>
+            <label className="menu-field">
+              <span>Speed</span>
+              <select value={s.speed} onChange={(e) => s.setSpeed(Number(e.target.value))}>
+                {SPEEDS.map((x) => <option key={x.v} value={x.v}>{x.l}</option>)}
+              </select>
+            </label>
+          </>
+        )
+      }}
+    </Menu>
   )
 }
 

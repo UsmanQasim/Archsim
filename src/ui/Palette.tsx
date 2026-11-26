@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CATALOG, CATEGORIES, KIND_ORDER } from '../sim/catalog'
+import { closeDrawerIfOverlay } from '../layout'
 import { useApp } from '../store'
 import { DND_MIME } from './FlowCanvas'
 import { KindIcon } from './Icon'
@@ -43,7 +44,7 @@ export function Palette() {
                     e.dataTransfer.setData(DND_MIME, d.kind)
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
-                  onClick={() => addNode(d.kind)}
+                  onClick={() => { addNode(d.kind); closeDrawerIfOverlay() }}
                   title={`${d.desc}\n\nWhen: ${d.when}`}
                   style={{ ['--accent' as string]: d.color }}
                 >

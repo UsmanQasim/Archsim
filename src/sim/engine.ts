@@ -5,7 +5,7 @@
  * Model (teaching approximation, see ASSUMPTIONS):
  *  - Traffic is a fluid of read/write requests per second flowing along edges in topological order.
  *  - Each node has a capacity; utilisation u = load / capacity. Overload drops the excess.
- *  - Service latency grows like M/M/1 queueing: base / (1 - u).
+ *  - Service latency grows like M/D/1 queueing: base × (1 + u / (2(1 − u))).
  *  - "split" edges share traffic by weight among healthy targets (automatic failover);
  *    "all" edges receive every request (fan-out / sequential dependency).
  *  - Queues decouple: producers see only the enqueue latency; backlog grows when consumers lag.
@@ -22,7 +22,7 @@ const MAX_LAT = 5000
 
 export const ASSUMPTIONS: string[] = [
   'Network RTT ≈ 1 ms per 100 km of great-circle distance + 2 ms; same region ≈ 0.5 ms; users add 5 ms last-mile.',
-  'Service latency follows M/M/1 queueing: base ÷ (1 − utilisation). Above 100 % the excess is dropped and the rest times out slowly.',
+  'Service latency follows M/D/1 queueing: base × (1 + u ÷ (2 × (1 − u))), where u is utilisation. Above 100 % the excess is dropped and the rest times out slowly.',
   'p99 per hop ≈ base × (1.5 + 2u/(1−u)). Along a path the means add and the tails combine like variances; a cache with ≥ 1 % misses puts the miss path into the p99.',
   '"Split" edges share load by weight among healthy targets — health checks give automatic failover. "Every request" edges are sequential calls.',
   'Caches and CDNs absorb their hit rate of reads; writes and misses continue downstream (write-through).',

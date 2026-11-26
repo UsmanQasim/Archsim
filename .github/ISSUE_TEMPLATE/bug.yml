@@ -1,0 +1,14 @@
+name: Bug report
+description: Something looks wrong or doesn't work
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead. A share link (File, Copy share link) helps a lot.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Browser and device
+      placeholder: Chrome 131 on Windows, Safari on iPhone 15

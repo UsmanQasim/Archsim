@@ -9,6 +9,8 @@ export function startSimLoop(): () => void {
   let last: unknown[] = []
   let lastAdviceAt = 0
   const run = () => {
+    // nothing to show while the tab is in the background
+    if (typeof document !== 'undefined' && document.hidden) return
     const s = useApp.getState()
     const dt = s.playing ? (s.speed * TICK_MS) / 1000 : 0
     const inputs = [s.nodes, s.edges, s.chaos, s.time]

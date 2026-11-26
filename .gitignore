@@ -68,3 +68,6 @@ Desktop.ini
 # Local test and debugging artifacts
 .vscode-test/
 .node_repl_history
+
+# PWA dev build
+dev-dist/

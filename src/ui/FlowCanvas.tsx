@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, type DragEvent } from 'react'
 import {
-  Background, BackgroundVariant, Controls, MiniMap, Panel, ReactFlow, useReactFlow,
+  getNodesBounds, Background, BackgroundVariant, Controls, MiniMap, Panel, ReactFlow, useReactFlow,
   type Connection, type Edge, type IsValidConnection, type NodeChange,
 } from '@xyflow/react'
 import { CATALOG } from '../sim/catalog'
@@ -27,7 +27,7 @@ export function FlowCanvas() {
   const select = useApp((s) => s.select)
   const addNode = useApp((s) => s.addNode)
   const checkpoint = useApp((s) => s.checkpoint)
-  const { screenToFlowPosition, fitView } = useReactFlow()
+  const { screenToFlowPosition, fitView, setViewport, getNodes } = useReactFlow()
   const view = useApp((s) => s.view)
   const theme = useApp((s) => s.theme)
   const count = useApp((s) => s.nodes.length)
@@ -38,9 +38,20 @@ export function FlowCanvas() {
   const loadTemplate = useApp((s) => s.loadTemplate)
   // re-frame smoothly when the pane resizes (view switch) or a design loads/tidies
   useEffect(() => {
-    const t = setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 350 }), 60)
+    const t = setTimeout(() => {
+      const pane = document.querySelector('.pane-2d')?.getBoundingClientRect()
+      const all = getNodes()
+      if (!pane || !all.length) return fitView({ padding: 0.2, maxZoom: 1, duration: 350 })
+      const b = getNodesBounds(all)
+      const fit = Math.min(1, (pane.width * 0.86) / Math.max(1, b.width), (pane.height * 0.8) / Math.max(1, b.height))
+      // too small to read: keep the text legible and start at the users on the left instead
+      const readable = pane.width < 700 ? 0.5 : 0.6
+      if (fit >= readable) return fitView({ padding: 0.2, maxZoom: 1, duration: 350 })
+      const z = Math.min(readable, Math.max(fit, (pane.height * 0.8) / Math.max(1, b.height)))
+      setViewport({ x: -b.x * z + 24, y: pane.height / 2 - (b.y + b.height / 2) * z, zoom: z }, { duration: 350 })
+    }, 60)
     return () => clearTimeout(t)
-  }, [view, fitTick, fitView])
+  }, [view, fitTick, fitView, setViewport, getNodes])
 
   const isValidConnection: IsValidConnection<SEdge> = useCallback((c: Connection | Edge) => {
     if (c.source === c.target) return false
@@ -98,7 +109,7 @@ export function FlowCanvas() {
         <MiniMap style={{ width: 150, height: 96 }} pannable zoomable nodeColor={(n) => (n.type === 'note' ? '#e8d77a' : CATALOG[(n as SNode).data.kind]?.color ?? '#888')} nodeBorderRadius={4} maskColor={theme === 'dark' ? 'rgba(20,22,25,0.6)' : 'rgba(246,247,245,0.7)'} />
         <Controls showInteractive={false} />
         <Panel position="top-left" className="board-tools">
-          <button className="btn small" onClick={() => setQuickAdd(true)} title="Search and add a component (Ctrl+K)">Add component <kbd>Ctrl K</kbd></button>
+          <button className="btn small" onClick={() => setQuickAdd(true)} title="Search and add a component (Ctrl+K)"><span className="hide-narrow-inline">Add component</span><span className="only-narrow-inline">Add</span> <kbd>Ctrl K</kbd></button>
           <button className="btn small" onClick={() => {
             const pane = document.querySelector('.pane-2d')?.getBoundingClientRect()
             if (!pane) return addNote()

@@ -1,0 +1,18 @@
+name: Challenge idea
+description: Suggest a system design problem to add
+labels: [challenge]
+body:
+  - type: input
+    attributes:
+      label: Problem
+      placeholder: Design a rate limiter
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Scale and targets
+      description: Users, requests per second, read/write mix, latency and availability targets, budget.
+  - type: textarea
+    attributes:
+      label: What a good answer has
+      description: The parts and decisions the reference solution should show.

@@ -4,6 +4,7 @@ import { ASSUMPTIONS } from '../sim/engine'
 import { GLOBAL, LOCATIONS, cloudRegions, rttMs } from '../sim/regions'
 import type { NodeConfig, SizeKey } from '../sim/types'
 import { fmtMoney, fmtMs, fmtNum, fmtPct, utilColor } from '../format'
+import { useDrawer } from '../layout'
 import { useApp, useSim, type SEdge, type SNode } from '../store'
 import { KindIcon } from './Icon'
 import { traceTree } from '../sim/analysis'
@@ -14,6 +15,9 @@ export function Inspector() {
   const edge = useApp((s) => (sel?.type === 'edge' ? s.edges.find((e) => e.id === sel.id) : undefined))
   return (
     <aside className="inspector">
+      <button className="drawer-close" onClick={() => useDrawer.getState().open(null)} aria-label="Close details">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
       {node ? <NodeInspector key={node.id} n={node} /> : edge ? <EdgeInspector key={edge.id} e={edge} /> : <Overview />}
     </aside>
   )

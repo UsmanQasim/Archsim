@@ -556,7 +556,6 @@ kbd { font: 700 12px var(--font); background: var(--well); border: 1px solid var
 .modal .btn { margin-top: 16px; }
 .toast { position: fixed; bottom: calc(var(--dock-h, 300px) + 16px); left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--paper); border-radius: 999px; padding: 8px 16px; font-weight: 600; box-shadow: var(--shadow-3); z-index: 120; animation: toast-in 0.18s ease-out; pointer-events: none; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 6px); } }
-.small-screen { display: none; }
 
 .panel-reopen {
   position: absolute; top: 10px; z-index: 12; display: inline-flex; align-items: center; gap: 5px;
@@ -597,9 +596,6 @@ body.resizing canvas { pointer-events: none; }
 }
 @media (max-height: 820px) {
   .metric-value { font-size: 18px; }
-}
-@media (max-width: 900px) {
-  .small-screen { display: grid; place-items: center; text-align: center; padding: 24px; position: fixed; inset: 0; background: var(--board); z-index: 200; font-size: 16px; }
 }
 @media (forced-colors: active) {
   .fnode.is-sel, .elabel.is-sel, :focus-visible { outline: 2px solid Highlight; }
@@ -881,97 +877,112 @@ body.resizing canvas { pointer-events: none; }
 .practice-notes-head { align-items: center; }
 .practice-clock b { font-size: 22px; } .practice-clock { margin-bottom: 4px; }
 
-/* Responsive workspace: side panels become temporary drawers on compact screens. */
-@media (max-width: 900px) {
-  .app {
-    grid-template-rows: auto minmax(0, 1fr) min(var(--dock-h), 42dvh);
-  }
-  .topbar {
-    position: relative; z-index: 35; height: auto; min-height: 52px; min-width: 0; max-width: 100%;
-    flex-wrap: wrap; align-content: center; gap: 4px 6px; padding: 6px 8px;
-  }
-  .main { position: relative; display: block; min-width: 0; overflow: hidden; }
-  .stage { position: absolute; inset: 0; }
-  .palette, .inspector {
-    position: absolute; top: 0; bottom: 0; z-index: 20;
-    width: min(340px, 88vw); box-shadow: var(--shadow-3);
-  }
-  .palette { left: 0; }
-  .inspector { right: 0; }
-  .stage.view-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(2, minmax(0, 1fr)); }
-  .stage.view-split .pane-3d { border-left: 0; border-top: 1px solid var(--line); }
-  .metrics { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding: 8px 12px; }
-  .metric { flex: 0 0 155px; padding-inline: 12px; }
-  .metric:first-child { padding-left: 4px; }
-  .dock { padding: 0 8px 8px; }
-  .dock-head { gap: 4px; }
-  .dock-tabs { flex: 1; }
-  .dock-tabs button { flex: none; padding: 6px 9px; }
-  .dock-body { padding: 8px 4px 4px; }
-  .advice-list { grid-template-columns: minmax(0, 1fr); }
-  .chaos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-  .costpanel { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .challenge { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .challenge-grid { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 0 18px; }
-  .daytest { grid-template-columns: minmax(0, 1fr); gap: 16px; height: auto; }
-  .estimate { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .practice-start { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .practice-live { grid-template-columns: minmax(0, 1fr); gap: 16px; height: auto; }
-  .practice-side { gap: 8px; }
-  .phase-list { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-  .practice-summary { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .board-empty { margin-bottom: 16px; }
-}
+/* ---------------------------------------------------------------- v6: responsive layout */
+.only-compact, .only-narrow, .drawer-close { display: none !important; }
+.scrim { display: none; }
 
-@media (max-width: 620px) {
-  .topbar { justify-content: flex-start; align-content: flex-start; }
-  .brand span { display: inline; }
-  .title-wrap { flex: 1 1 170px; }
-  .title-input { min-width: 90px; }
-  .save-status { display: none; }
-  .topbar > .menu { flex: 0 0 auto; }
-  .topbar > .menu .tbtn { padding-inline: 7px; }
-  .menu-pop, .menu-pop.wide { position: fixed; top: 54px; left: 8px; right: 8px; width: auto; max-height: min(72dvh, 620px); }
-  .tools { margin-left: auto; max-width: 100%; }
-  .clock { gap: 5px; margin-left: 0; }
-  .clock-face { min-width: 42px; }
-  .clock-time { font-size: 13px; }
-  .clock select { max-width: 88px; }
-  select.provider { max-width: 92px; }
-  .view-seg { order: 10; }
-  .view-seg button { padding: 4px 8px; }
-  .palette, .inspector { width: min(360px, 92vw); }
-  .react-flow__minimap { display: none; }
-  .dock-tabs button { padding: 6px 8px; font-size: 12.5px; }
-  .badge { display: none; }
-  .metrics { padding-inline: 8px; }
-  .metric { flex-basis: 138px; }
-  .metric-value { font-size: 17px; }
-  .metric-label { font-size: 11.5px; }
-  .chaos { grid-template-columns: minmax(0, 1fr); }
-  .est-inputs { grid-template-columns: minmax(0, 1fr); }
-  .est-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .prompts { columns: 1; }
-  .practice-notes-head { align-items: flex-start; flex-direction: column; }
-  .practice-actions { flex-wrap: wrap; gap: 8px; }
-  .phase-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .board-empty { width: min(420px, calc(100% - 24px)); margin: 0 12px 12px; padding: 12px; }
-  .board-empty-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .board-empty-actions button small { display: none; }
-  .keys { grid-template-columns: minmax(0, 1fr); }
+/* compact: tablets and small laptops. Side panels slide in over the board. */
+.app.layout-compact .main, .app.layout-narrow .main { grid-template-columns: minmax(0, 1fr); position: relative; }
+.app.layout-compact .only-compact, .app.layout-narrow .only-compact { display: inline-flex !important; }
+.app.layout-compact .hide-compact, .app.layout-narrow .hide-compact { display: none !important; }
+.app.layout-compact .palette, .app.layout-narrow .palette,
+.app.layout-compact .inspector, .app.layout-narrow .inspector {
+  position: absolute; top: 0; bottom: 0; z-index: 40; width: min(340px, 88vw); box-shadow: var(--shadow-3);
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0.22s; visibility: hidden;
 }
+.app.layout-compact .palette, .app.layout-narrow .palette { left: 0; transform: translateX(-102%); width: min(300px, 84vw); }
+.app.layout-compact .inspector, .app.layout-narrow .inspector { right: 0; transform: translateX(102%); }
+.app.drawer-palette .palette, .app.drawer-inspector .inspector { transform: none; visibility: visible; }
+.app.layout-compact .drawer-close, .app.layout-narrow .drawer-close {
+  display: grid !important; place-items: center; position: sticky; top: 8px; margin: 8px 8px -44px auto; z-index: 2;
+  width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--paper); color: var(--ink-2);
+}
+.app.layout-compact .scrim, .app.layout-narrow .scrim { display: block; position: absolute; inset: 0; z-index: 35; background: rgba(20, 22, 25, 0.28); }
+.app.layout-compact .pal-desc { display: block; }
+.app.layout-compact .title-input { width: 140px; flex-basis: 140px; }
 
-@media (max-width: 390px) {
-  .topbar { gap: 3px; padding-inline: 5px; }
-  .brand svg { width: 20px; }
-  .brand { gap: 4px; }
-  .title-wrap { flex-basis: 140px; }
-  .title-input { padding-inline: 4px; font-size: 12px; }
-  .clock select { max-width: 72px; }
-  .tbtn { padding: 4px 5px; }
-  .view-seg button { padding-inline: 6px; font-size: 11.5px; }
-  .board-tools { flex-wrap: wrap; max-width: calc(100% - 20px); }
-  .board-tools .btn { padding: 5px 7px; }
-  .map-head { align-items: flex-start; flex-direction: column; gap: 6px; }
-  .map-legend { gap: 8px; font-size: 12px; }
+/* narrow: phones */
+.app.layout-narrow .hide-narrow { display: none !important; }
+.app.layout-narrow .only-narrow { display: inline-flex !important; }
+.app.layout-narrow .topbar { gap: 4px; padding: 0 6px; }
+.app.layout-narrow .brand span, .app.layout-narrow .title-input, .app.layout-narrow .scrub, .app.layout-narrow .timer-phase { display: none; }
+.app.layout-narrow .brand { display: none; }
+.app.layout-narrow .clock { gap: 6px; margin-left: auto; }
+.app.layout-narrow .clock-face { min-width: 0; }
+.app.layout-narrow .view-seg button { padding: 5px 8px; }
+.app.layout-narrow .tbtn { padding: 7px 8px; }
+.app.layout-narrow .menu-pop, .app.layout-narrow .menu-pop.wide {
+  position: fixed; top: 52px; left: 8px; right: 8px; width: auto; max-height: calc(100vh - 70px);
 }
+.menu-back { display: flex; align-items: center; gap: 4px; background: none; border: 0; padding: 8px 10px; font-weight: 700; color: var(--ink-2); }
+.menu-back svg { transform: rotate(90deg); }
+.menu-item.nav { flex-direction: row; justify-content: space-between; align-items: baseline; }
+.menu-sep { height: 1px; background: var(--line); margin: 6px 4px; }
+.menu-inline { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px 8px; }
+.menu-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 11px; font-size: 13.5px; color: var(--ink-2); }
+.menu-field select { max-width: 60%; }
+
+/* the bottom panel on phones: scroll sideways rather than squash */
+.app.layout-narrow .metrics { overflow-x: auto; scrollbar-width: none; padding: 6px 8px; }
+.app.layout-narrow .metrics::-webkit-scrollbar { display: none; }
+.app.layout-narrow .metric { flex: 0 0 auto; min-width: 128px; padding: 0 12px; }
+.app.layout-narrow .metric-value { font-size: 17px; }
+.app.layout-narrow .dock-tabs { overflow-x: auto; scrollbar-width: none; }
+.app.layout-narrow .dock-tabs::-webkit-scrollbar { display: none; }
+.app.layout-narrow .dock-tabs button { flex: none; }
+.app.layout-narrow .dock-body { padding-left: 2px; padding-right: 2px; }
+.app.layout-narrow :is(.chaos, .costpanel, .challenge, .daytest, .estimate, .practice-start, .practice-live, .practice-summary) {
+  grid-template-columns: minmax(0, 1fr); gap: 18px; height: auto;
+}
+.app.layout-narrow :is(.advice-list, .challenge-grid, .checks) { grid-template-columns: minmax(0, 1fr); }
+.app.layout-narrow .est-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.app.layout-narrow .prompts { columns: 1; }
+.app.layout-narrow .practice-text { min-height: 120px; }
+.app.layout-narrow .map-head { flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 10px 0; }
+.app.layout-narrow .map-legend { gap: 4px 12px; font-size: 11.5px; }
+.app.layout-narrow .map-wrap { padding: 4px 6px 8px; }
+.app.layout-narrow .map-pop { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; transform: none; width: auto; }
+.app.layout-narrow .map-global { left: 8px; bottom: 8px; max-width: calc(100% - 16px); }
+.app.layout-narrow .react-flow__minimap { display: none; }
+.app.layout-narrow .board-tools kbd { display: none; }
+.app.layout-compact .map-global { max-width: calc(100% - 56px); }
+.app.layout-compact :is(.costpanel, .estimate) { grid-template-columns: minmax(0, 1fr); }
+.app.layout-compact .chaos { grid-template-columns: 1fr 1fr; }
+@media (pointer: coarse) {
+  .react-flow__handle { width: 16px; height: 16px; }
+  .tbtn, .dock-tabs button { min-height: 36px; }
+}
+html, body { overflow: hidden; overscroll-behavior: none; }
+.app { width: 100%; overflow: hidden; }
+.app.layout-compact .main, .app.layout-narrow .main { overflow: hidden; }
+.app.layout-narrow .board-tools { margin: 8px !important; gap: 4px; }
+.app.layout-narrow .board-tools .btn { white-space: nowrap; padding: 6px 9px; }
+.app.layout-narrow .modal { padding: 20px 18px; width: calc(100vw - 20px); max-height: calc(100vh - 40px); }
+.app.layout-narrow .keys { grid-template-columns: 1fr; }
+.only-narrow-inline { display: none; }
+.app.layout-narrow .only-narrow-inline { display: inline; }
+.app.layout-narrow .hide-narrow-inline { display: none; }
+.map-wrap { grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+.map-svg { min-width: 0; min-height: 0; }
+.pane-loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13.5px; }
+/* mid-size screens: cloud names, speed, theme and help move into the menu so the bar never overflows */
+.only-mid { display: none !important; }
+@media (max-width: 1400px) {
+  .hide-mid { display: none !important; }
+  .only-mid { display: inline-flex !important; }
+  .tools .menu-more .menu-pop { right: 0; left: auto; }
+}
+.app.layout-compact .clock-face { min-width: 0; }
+.app.layout-compact .topbar { gap: 4px; }
+.app.layout-compact .menu.hide-narrow .tbtn { padding: 6px 8px; }
+@media (max-width: 960px) {
+  .hide-sm, .brand span { display: none !important; }
+  .title-wrap, .save-status { display: none !important; }
+}
+.app.layout-narrow .title-wrap, .app.layout-narrow .save-status, .app.layout-narrow .scrub-box { display: none !important; }
+.app.layout-narrow .board-empty { width: min(420px, calc(100% - 24px)); margin: 0 12px 12px; padding: 12px; }
+.app.layout-narrow .board-empty-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.app.layout-narrow .board-empty-actions button small { display: none; }
+.app.layout-narrow .dock { padding: 0 8px 8px; }
+/* keep the board buttons clear of the "show components" tab when the side panel is hidden */
+.stage:has(> .panel-reopen.left) .board-tools { margin-left: 136px !important; }
