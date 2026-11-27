@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CATALOG, FIELD_META, PROVIDERS, SIZES, fieldLabel, visibleFields, type FieldKey } from '../sim/catalog'
+import { CATALOG, FIELD_META, PROVIDERS, SIZES, fieldLabel, visibleFields, type FieldKey, catVars } from '../sim/catalog'
 import { ASSUMPTIONS } from '../sim/engine'
 import { GLOBAL, LOCATIONS, cloudRegions, rttMs } from '../sim/regions'
 import type { NodeConfig, SizeKey } from '../sim/types'
@@ -157,7 +157,7 @@ function NodeInspector({ n }: { n: SNode }) {
 
   return (
     <div className="insp">
-      <div className="insp-head" style={{ ['--accent' as string]: def.color }}>
+      <div className="insp-head" style={catVars(n.data.kind)}>
         <span className="tile big"><KindIcon kind={n.data.kind} size={22} /></span>
         <div className="grow">
           <input className="name-input" value={n.data.label} disabled={locked} onChange={(e) => rename(n.id, e.target.value)} aria-label="Component name" />
@@ -249,7 +249,7 @@ function TimeBreakdown({ id }: { id: string }) {
         {rows.map((r, i) => (
           <li key={`${r.id}-${i}`} style={{ paddingLeft: (r.depth - 1) * 12 }}>
             <button className="trace-name" onClick={() => select({ type: 'node', id: r.id })} title={r.note}>
-              <span className="tile tiny" style={{ ['--accent' as string]: CATALOG[r.kind].color }}><KindIcon kind={r.kind} size={12} /></span>
+              <span className="tile tiny" style={catVars(r.kind)}><KindIcon kind={r.kind} size={12} /></span>
               <span className="ellip">{r.label}</span>
             </button>
             <span className="trace-bar"><span style={{ width: `${(r.contribution / max) * 100}%` }} /></span>

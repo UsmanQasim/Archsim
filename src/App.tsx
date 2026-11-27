@@ -8,18 +8,25 @@ import { FlowCanvas } from './ui/FlowCanvas'
 import { Inspector } from './ui/Inspector'
 import { Dock, MetricsStrip } from './ui/Dock'
 import { QuickAdd } from './ui/QuickAdd'
-import { ProblemBank, ResultView, SubmitDialog } from './ui/Bank'
+import { ResultView, SubmitDialog } from './ui/Bank'
 import { getLayout, useDrawer, useLayout } from './layout'
+import { Nav } from './ui/Nav'
+import { useRoute } from './route'
+import { LearnPage } from './ui/LearnPage'
 
 // the 3D model (three.js) and the world map are loaded only when first shown
 const Scene3D = lazy(() => import('./ui/Scene3D').then((m) => ({ default: m.Scene3D })))
 const MapView = lazy(() => import('./ui/MapView').then((m) => ({ default: m.MapView })))
+// the library carries the case studies' text, so it loads when first opened
+const LibraryPage = lazy(() => import('./ui/LibraryPage').then((m) => ({ default: m.LibraryPage })))
 
 function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement
       if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      // board shortcuts only where there is a board
+      if (useRoute.getState().page === 'library') return
       const s = useApp.getState()
       const mod = e.ctrlKey || e.metaKey
       const key = e.key.toLowerCase()
@@ -124,10 +131,8 @@ function useDockHeight() {
   return { h, start, setH }
 }
 
-export default function App() {
+function LabPage() {
   const view = useApp((s) => s.view)
-  const toast = useApp((s) => s.toast)
-  const theme = useApp((s) => s.theme)
   const paletteOpen = useApp((s) => s.paletteOpen)
   const inspectorOpen = useApp((s) => s.inspectorOpen)
   const dockOpen = useApp((s) => s.dockOpen)
@@ -156,9 +161,94 @@ export default function App() {
   useEffect(() => {
     if (layout !== 'wide' && view === 'split') useApp.getState().setView('2d')
   }, [layout, view])
+
+  const bottomH = dockOpen ? dock.h : 66
+
+  return (
+    <div
+      className={`app layout-${layout} ${drawer ? `drawer-${drawer}` : ''}`}
+      style={{
+        gridTemplateRows: 'auto minmax(0, 1fr) var(--dock-h)',
+        ['--dock-h' as string]: `${bottomH}px`,
+        ['--pal-w' as string]: !wide || paletteOpen ? undefined : '0px',
+        ['--insp-w' as string]: !wide || inspectorOpen ? undefined : '0px',
+      }}
+    >
+      <Topbar />
+      <div className="main">
+        {!wide || paletteOpen ? <Palette /> : <div aria-hidden="true" />}
+        <main className={`stage view-${view}`}>
+          {wide && !paletteOpen && (
+            <button type="button" className="panel-reopen left" onClick={togglePalette} title="Show components ([)" aria-label="Show components panel">
+              Components →
+            </button>
+          )}
+          {wide && !inspectorOpen && (
+            <button type="button" className="panel-reopen right" onClick={toggleInspector} title="Show inspector (])" aria-label="Show inspector panel">
+              ← Inspector
+            </button>
+          )}
+          {(view === '2d' || view === 'split') && (
+            <div className="pane pane-2d">
+              <FlowCanvas />
+            </div>
+          )}
+          {view === 'map' && (
+            <div className="pane pane-map">
+              <Suspense fallback={<div className="pane-loading">Loading the map…</div>}>
+                <MapView />
+              </Suspense>
+            </div>
+          )}
+          {(view === '3d' || view === 'split') && (
+            <div className="pane pane-3d">
+              <Suspense fallback={<div className="pane-loading">Loading the 3D model…</div>}>
+                <Scene3D />
+              </Suspense>
+            </div>
+          )}
+        </main>
+        {!wide || inspectorOpen ? <Inspector /> : <div aria-hidden="true" />}
+        {!wide && drawer && <div className="scrim" onClick={() => openDrawer(null)} aria-hidden />}
+      </div>
+      <div className={`app-bottom ${dockOpen ? '' : 'is-collapsed'}`}>
+        {dockOpen && (
+          <div
+            className="dock-resizer"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize bottom panel"
+            aria-valuenow={Math.round(dock.h)}
+            aria-valuemin={180}
+            aria-valuemax={Math.max(180, window.innerHeight - 260)}
+            tabIndex={0}
+            onPointerDown={dock.start}
+            onDoubleClick={() => dock.setH(dock.h > 320 ? 280 : 440)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowUp') dock.setH(Math.min(window.innerHeight - 260, dock.h + 24))
+              if (e.key === 'ArrowDown') dock.setH(Math.max(180, dock.h - 24))
+            }}
+          />
+        )}
+        <MetricsStrip />
+        <Dock />
+      </div>
+    </div>
+  )
+}
+
+export default function App() {
+  const page = useRoute((s) => s.page)
+  const toast = useApp((s) => s.toast)
+  const theme = useApp((s) => s.theme)
+  const restoreLab = useApp((s) => s.restoreLab)
   useEffect(() => {
     document.documentElement.dataset.theme = theme
   }, [theme])
+  // a lesson borrows the board; outside Learn the simulator gets its own design back
+  useEffect(() => {
+    if (page !== 'learn') restoreLab()
+  }, [page, restoreLab])
   useShortcuts()
   useEffect(() => {
     initFromUrlOrStorage()
@@ -180,80 +270,20 @@ export default function App() {
     }
   }, [])
 
-  const bottomH = dockOpen ? dock.h : 66
-
   return (
     <ReactFlowProvider>
-      <div
-        className={`app layout-${layout} ${drawer ? `drawer-${drawer}` : ''}`}
-        style={{
-          gridTemplateRows: 'auto minmax(0, 1fr) var(--dock-h)',
-          ['--dock-h' as string]: `${bottomH}px`,
-          ['--pal-w' as string]: !wide || paletteOpen ? undefined : '0px',
-          ['--insp-w' as string]: !wide || inspectorOpen ? undefined : '0px',
-        }}
-      >
-        <Topbar />
-        <div className="main">
-          {!wide || paletteOpen ? <Palette /> : <div aria-hidden="true" />}
-          <main className={`stage view-${view}`}>
-            {wide && !paletteOpen && (
-              <button type="button" className="panel-reopen left" onClick={togglePalette} title="Show components ([)" aria-label="Show components panel">
-                Components →
-              </button>
-            )}
-            {wide && !inspectorOpen && (
-              <button type="button" className="panel-reopen right" onClick={toggleInspector} title="Show inspector (])" aria-label="Show inspector panel">
-                ← Inspector
-              </button>
-            )}
-            {(view === '2d' || view === 'split') && (
-              <div className="pane pane-2d">
-                <FlowCanvas />
-              </div>
-            )}
-            {view === 'map' && (
-              <div className="pane pane-map">
-                <Suspense fallback={<div className="pane-loading">Loading the map…</div>}>
-                  <MapView />
-                </Suspense>
-              </div>
-            )}
-            {(view === '3d' || view === 'split') && (
-              <div className="pane pane-3d">
-                <Suspense fallback={<div className="pane-loading">Loading the 3D model…</div>}>
-                  <Scene3D />
-                </Suspense>
-              </div>
-            )}
-          </main>
-          {!wide || inspectorOpen ? <Inspector /> : <div aria-hidden="true" />}
-          {!wide && drawer && <div className="scrim" onClick={() => openDrawer(null)} aria-hidden />}
-        </div>
-        <div className={`app-bottom ${dockOpen ? '' : 'is-collapsed'}`}>
-          {dockOpen && (
-            <div
-              className="dock-resizer"
-              role="separator"
-              aria-orientation="horizontal"
-              aria-label="Resize bottom panel"
-              aria-valuenow={Math.round(dock.h)}
-              aria-valuemin={180}
-              aria-valuemax={Math.max(180, window.innerHeight - 260)}
-              tabIndex={0}
-              onPointerDown={dock.start}
-              onDoubleClick={() => dock.setH(dock.h > 320 ? 280 : 440)}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowUp') dock.setH(Math.min(window.innerHeight - 260, dock.h + 24))
-                if (e.key === 'ArrowDown') dock.setH(Math.max(180, dock.h - 24))
-              }}
-            />
+      <div className={`shell page-${page}`}>
+        <Nav />
+        <div className="page">
+          {page === 'lab' && <LabPage />}
+          {page === 'learn' && <LearnPage />}
+          {page === 'library' && (
+            <Suspense fallback={<div className="pane-loading">Loading the library…</div>}>
+              <LibraryPage />
+            </Suspense>
           )}
-          <MetricsStrip />
-          <Dock />
         </div>
         <HelpModal />
-        <ProblemBank />
         <SubmitDialog />
         <ResultView />
         <QuickAdd />

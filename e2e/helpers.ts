@@ -13,7 +13,7 @@ export async function openApp(page: Page, opts: { welcome?: boolean; hash?: stri
     }
   }, !!opts.welcome)
   await page.goto('/' + (opts.hash ?? ''))
-  await expect(page.locator('.topbar')).toBeVisible()
+  await expect(page.locator('.nav')).toBeVisible()
   return errors
 }
 

@@ -454,3 +454,12 @@ export function visibleFields(kind: NodeKind, cfg: NodeConfig): FieldKey[] {
 export const fieldLabel = (kind: NodeKind, f: FieldKey) => CATALOG[kind].fieldLabels?.[f] ?? FIELD_META[f].label
 
 export const providerName = (kind: NodeKind, p: Provider) => CATALOG[kind].providers[p]
+
+const CAT_SLUG: Record<Category, string> = {
+  Traffic: 'traffic', Edge: 'edge', Compute: 'compute', Data: 'data', Messaging: 'messaging', 'Analytics & AI': 'ai', External: 'external',
+}
+/** CSS variables that colour a component everywhere: its marker colour and its family's pastel. */
+export const catVars = (kind: NodeKind): Record<string, string> => ({
+  '--accent': CATALOG[kind].color,
+  '--cat': `var(--cat-${CAT_SLUG[CATALOG[kind].category]})`,
+})

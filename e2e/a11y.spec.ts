@@ -32,18 +32,27 @@ test('welcome dialog is accessible', async ({ page }) => {
 })
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`problems, lessons and the challenge editor are accessible, ${theme} theme`, async ({ page }) => {
+  test(`the library, a case study, the course and the challenge editor are accessible, ${theme} theme`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme })
-    await openApp(page)
+    await openApp(page, { hash: '#/library' })
     if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
-    const more = page.getByRole('button', { name: 'More' })
-    if (await page.getByRole('button', { name: /^Problems/ }).isVisible()) await page.getByRole('button', { name: /^Problems/ }).click()
-    else { await more.click(); await page.locator('.menu-item', { hasText: 'Problems' }).click() }
-    const tabs = page.getByRole('tablist', { name: 'Sections' })
+    await expect(page.locator('.case-card').first()).toBeVisible()
     expect(await audit(page)).toEqual([])
-    await tabs.getByRole('tab', { name: 'Learn' }).click()
+    await page.goto('/#/library/company/netflix')
+    if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+    await expect(page.locator('.case-numbers')).toBeVisible()
     expect(await audit(page)).toEqual([])
-    await tabs.getByRole('tab', { name: 'Create a challenge' }).click()
+    await page.goto('/#/library/problems')
+    if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+    await expect(page.locator('.ptable')).toBeVisible()
+    expect(await audit(page)).toEqual([])
+    await page.goto('/#/library/create')
+    if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+    await expect(page.locator('.editor')).toBeVisible()
+    expect(await audit(page)).toEqual([])
+    await page.goto('/#/learn')
+    if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+    await expect(page.locator('.step-panel')).toBeVisible()
     expect(await audit(page)).toEqual([])
   })
 }

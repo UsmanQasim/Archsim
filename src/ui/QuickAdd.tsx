@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useReactFlow } from '@xyflow/react'
-import { CATALOG, KIND_ORDER } from '../sim/catalog'
+import { CATALOG, KIND_ORDER, catVars } from '../sim/catalog'
 import { useApp } from '../store'
 import { KindIcon } from './Icon'
 
@@ -99,7 +99,7 @@ export function QuickAdd() {
       <ul className="qa-list" role="listbox">
         {list.map((d, idx) => (
           <li key={d.kind} role="option" aria-selected={idx === i}>
-            <button type="button" className={idx === i ? 'on' : ''} onMouseEnter={() => setI(idx)} onClick={() => pick(idx)} style={{ ['--accent' as string]: d.color }}>
+            <button type="button" className={idx === i ? 'on' : ''} onMouseEnter={() => setI(idx)} onClick={() => pick(idx)} style={catVars(d.kind)}>
               <span className="tile"><KindIcon kind={d.kind} size={16} /></span>
               <span className="qa-text"><b>{d.label}</b><span>{d.providers[provider]}</span></span>
               <span className="qa-cat">{d.category}</span>

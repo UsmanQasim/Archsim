@@ -85,17 +85,12 @@ export function Topbar() {
   const canUndo = useApp((s) => s.past.length > 0)
   const canRedo = useApp((s) => s.future.length > 0)
   const loadTemplate = useApp((s) => s.loadTemplate)
-  const openBank = useApp((s) => s.openBank)
   useApp((s) => s.customVersion)
   const shareLink = useApp((s) => s.shareLink)
   const exportJson = useApp((s) => s.exportJson)
   const importJson = useApp((s) => s.importJson)
-  const setHelp = useApp((s) => s.setHelp)
   const provider = useApp((s) => s.provider)
   const setProvider = useApp((s) => s.setProvider)
-  const passed = useApp((s) => s.passed)
-  const theme = useApp((s) => s.theme)
-  const toggleTheme = useApp((s) => s.toggleTheme)
   const fileRef = useRef<HTMLInputElement>(null)
   const drawer = useDrawer((s) => s.drawer)
   const toggleDrawer = useDrawer((s) => s.toggle)
@@ -107,15 +102,6 @@ export function Topbar() {
       <button className={`tbtn only-compact ${drawer === 'palette' ? 'on' : ''}`} onClick={() => toggleDrawer('palette')} aria-label="Components" title="Components" aria-expanded={drawer === 'palette'}>
         <Ico d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM17 14v6M14 17h6" />
       </button>
-      <div className="brand">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <rect x="3" y="4" width="6" height="5" rx="1.5" />
-          <rect x="15" y="4" width="6" height="5" rx="1.5" />
-          <rect x="9" y="15" width="6" height="5" rx="1.5" />
-          <path d="M6 9v2.5c0 1 .8 1.5 1.8 1.5H12m6-4v2.5c0 1-.8 1.5-1.8 1.5H12m0 0v2" />
-        </svg>
-        <span>ArchSim</span>
-      </div>
       <div className="title-wrap">
         <input className="title-input" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Design title" />
       </div>
@@ -132,10 +118,6 @@ export function Topbar() {
           </button>
         ))}
       </Menu>
-      <button className="tbtn hide-narrow" onClick={() => openBank('problems')} title="Interview problems, lessons, and your own challenges">
-        Problems <span className="tb-count">{allChallenges().filter((c) => passed[c.id]).length}/{allChallenges().length}</span>
-      </button>
-      <button className="tbtn hide-narrow hide-mid" onClick={() => openBank('learn')}>Learn</button>
 
       <div className="seg view-seg" role="group" aria-label="View">
         {(['2d', 'split', '3d', 'map'] as View[]).map((v) => (
@@ -198,11 +180,7 @@ export function Topbar() {
             </>
           )}
         </Menu>
-        <button className="tbtn hide-narrow hide-mid" onClick={toggleTheme} aria-label={theme === 'light' ? 'Switch to night mode' : 'Switch to day mode'} title={theme === 'light' ? 'Night mode' : 'Day mode'}>
-          {theme === 'light' ? <Ico d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" /> : <Ico d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />}
-        </button>
         <MoreMenu onImport={() => fileRef.current?.click()} />
-        <button className="tbtn hide-narrow hide-mid" onClick={() => setHelp(true)} aria-label="Help" title="How to use ArchSim"><Ico d="M9.2 9a3 3 0 0 1 5.6 1.2c0 2-2.8 2.4-2.8 4.3M12 17.6v.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" /></button>
         <input
           ref={fileRef}
           type="file"
@@ -239,16 +217,12 @@ function MoreMenu({ onImport }: { onImport: () => void }) {
         return (
           <>
             <button className="menu-item nav" onClick={() => setSub('templates')}><b>Templates</b></button>
-            <button className="menu-item" onClick={() => { s.openBank('problems'); done() }}><b>Problems</b><span>{allChallenges().filter((c) => s.passed[c.id]).length} of {allChallenges().length} solved</span></button>
-            <button className="menu-item" onClick={() => { s.openBank('learn'); done() }}><b>Learn</b><span>Short lessons with a live task each</span></button>
             <button className="menu-item" onClick={() => { s.openBank('create'); done() }}><b>Create a challenge</b><span>For interviewers: share a problem as a link</span></button>
             <button className="menu-item nav" onClick={() => setSub('file')}><b>File</b><span>Share, export, import</span></button>
             <div className="menu-sep" />
             <div className="menu-inline">
               <button className="tbtn small" onClick={s.undo} disabled={!s.past.length}>Undo</button>
               <button className="tbtn small" onClick={s.redo} disabled={!s.future.length}>Redo</button>
-              <button className="tbtn small" onClick={s.toggleTheme}>{s.theme === 'light' ? 'Night mode' : 'Day mode'}</button>
-              <button className="tbtn small" onClick={() => { s.setHelp(true); done() }}>Help</button>
             </div>
             <label className="menu-field">
               <span>Cloud names</span>

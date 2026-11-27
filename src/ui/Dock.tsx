@@ -1,8 +1,7 @@
+import { useRoute } from '../route'
 import { useState } from 'react'
 import type { Advice } from '../sim/advisor'
 import { allChallenges, findChallenge } from '../sim/scenarios'
-import { LessonPanel } from './Bank'
-import { LESSONS } from '../learn'
 import { CATALOG, type Category } from '../sim/catalog'
 import { ComparePanel, EstimatePanel, GrowthPanel, LimitPanel } from './Panels'
 import { PracticePanel } from './Practice'
@@ -88,19 +87,19 @@ export function Dock() {
   const guide = useApp((s) => s.guide)
   const variantCount = useApp((s) => s.variants.length)
   const interview = useApp((s) => s.interview)
-  const lesson = useApp((s) => s.lesson)
-  const lessonInfo = lesson ? `${lesson.step + 1}/${LESSONS.find((l) => l.id === lesson.id)?.steps.length ?? 0}` : undefined
-  const tabs: { id: DockTab; label: string; badge?: string | number; tone?: string }[] = [
+  const allTabs: ({ id: DockTab; label: string; badge?: string | number; tone?: string } | false)[] = [
+    (!!challengeId || !!guide) && { id: 'challenge', label: guide ? 'Solution' : 'Challenge', badge: guide ? `step ${guide.step + 1}` : 'active', tone: 'live' },
     { id: 'advisor', label: 'Advisor', badge: general.length || undefined, tone: crit ? 'bad' : 'muted' },
-    { id: 'cost', label: 'Cost', badge: saving > 1 ? `save ${fmtMoney(saving)}` : undefined, tone: 'good' },
     { id: 'chaos', label: 'Chaos', badge: chaosCount || undefined, tone: 'bad' },
-    { id: 'challenge', label: guide ? 'Solution' : challengeId ? 'Challenge' : 'Challenges', badge: guide ? `step ${guide.step + 1}` : challengeId ? 'active' : undefined, tone: 'live' },
-    { id: 'learn', label: lesson ? 'Lesson' : 'Learn', badge: lessonInfo, tone: 'live' },
+    { id: 'cost', label: 'Cost', badge: saving > 1 ? `save ${fmtMoney(saving)}` : undefined, tone: 'good' },
     { id: 'tests', label: 'Stress tests' },
     { id: 'compare', label: 'Compare', badge: variantCount || undefined, tone: 'muted' },
     { id: 'estimate', label: 'Estimate' },
-    { id: 'practice', label: 'Practice', badge: interview && !interview.finishedAt ? 'live' : undefined, tone: 'live' },
+    { id: 'practice', label: 'Mock interview', badge: interview && !interview.finishedAt ? 'live' : undefined, tone: 'live' },
   ]
+  const tabs = allTabs.filter((t): t is Exclude<typeof t, false> => !!t)
+  // a tab that is not offered right now (no active challenge) falls back to the advisor
+  const cur: DockTab = tabs.some((t) => t.id === tab) ? tab : 'advisor'
   const onTabKey = (e: React.KeyboardEvent, idx: number) => {
     const move = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : e.key === 'Home' ? -idx : e.key === 'End' ? tabs.length - 1 - idx : 0
     if (!move && e.key !== 'Home' && e.key !== 'End') return
@@ -120,10 +119,10 @@ export function Dock() {
               id={`dock-tab-${t.id}`}
               type="button"
               role="tab"
-              aria-selected={tab === t.id}
+              aria-selected={cur === t.id}
               aria-controls={`dock-panel-${t.id}`}
-              tabIndex={tab === t.id ? 0 : -1}
-              className={tab === t.id ? 'on' : ''}
+              tabIndex={cur === t.id ? 0 : -1}
+              className={cur === t.id ? 'on' : ''}
               onClick={() => {
                 setTab(t.id)
                 if (!dockOpen) toggleDock()
@@ -140,16 +139,15 @@ export function Dock() {
         </button>
       </div>
       {dockOpen && (
-        <div className="dock-body" key={tab} id={`dock-panel-${tab}`} role="tabpanel" aria-labelledby={`dock-tab-${tab}`}>
-          {tab === 'advisor' && <AdvisorPanel />}
-          {tab === 'cost' && <CostPanel />}
-          {tab === 'chaos' && <ChaosPanel />}
-          {tab === 'challenge' && <ChallengePanel />}
-          {tab === 'learn' && <LessonPanel />}
-          {tab === 'tests' && <TestsPanel />}
-          {tab === 'compare' && <ComparePanel />}
-          {tab === 'estimate' && <EstimatePanel />}
-          {tab === 'practice' && <PracticePanel />}
+        <div className="dock-body" key={cur} id={`dock-panel-${cur}`} role="tabpanel" aria-labelledby={`dock-tab-${cur}`}>
+          {cur === 'advisor' && <AdvisorPanel />}
+          {cur === 'cost' && <CostPanel />}
+          {cur === 'chaos' && <ChaosPanel />}
+          {cur === 'challenge' && <ChallengePanel />}
+          {cur === 'tests' && <TestsPanel />}
+          {cur === 'compare' && <ComparePanel />}
+          {cur === 'estimate' && <EstimatePanel />}
+          {cur === 'practice' && <PracticePanel />}
         </div>
       )}
     </section>
@@ -442,6 +440,7 @@ function ActiveChallenge() {
       <div className="ch-brief">
         <div className="ch-top"><b>{ch.title}</b><span className={`diff d-${ch.difficulty}`}>{ch.difficulty}</span></div>
         <p className="small">{ch.brief}</p>
+        <CaseLink id={ch.id} />
         <div className="concepts">{ch.concepts.map((k) => <span key={k}>{k}</span>)}</div>
         <div className="hints">
           {ch.hints.slice(0, hints).map((h) => <div key={h} className="hint">{h}</div>)}
@@ -476,6 +475,7 @@ function GuidePanel() {
           ))}
         </ol>
         <div className="step-why"><b>{st.title}.</b> {st.why}</div>
+        <CaseLink id={ch.id} />
         <div className="btnrow">
           <button className="btn" onClick={() => guideTo(guide.step - 1)} disabled={guide.step === 0}>Previous</button>
           <button className="btn btn-accent" onClick={() => guideTo(guide.step + 1)} disabled={last}>Next step</button>
@@ -592,3 +592,14 @@ function DayChart({ report }: { report: NonNullable<ReturnType<typeof useApp.get
   )
 }
 
+
+/** Company case-study challenges link back to the article that explains them. */
+function CaseLink({ id }: { id: string }) {
+  const go = useRoute((s) => s.go)
+  if (!id.startsWith('co-')) return null
+  return (
+    <a className="linkbtn small case-link" href={`#/library/company/${id}`} onClick={(e) => { e.preventDefault(); go({ page: 'library', a: 'company', b: id }) }}>
+      Read how the real system works
+    </a>
+  )
+}

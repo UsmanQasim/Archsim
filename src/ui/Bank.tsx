@@ -67,7 +67,7 @@ export function ProblemBank() {
   )
 }
 
-function ProblemList() {
+export function ProblemList({ mine = false, topic: fixedTopic }: { mine?: boolean; topic?: string } = {}) {
   useApp((s) => s.customVersion)
   const passed = useApp((s) => s.passed)
   const startChallenge = useApp((s) => s.startChallenge)
@@ -80,8 +80,8 @@ function ProblemList() {
   const [diff, setDiff] = useState<'All' | Difficulty>('All')
   const [topic, setTopic] = useState('All')
   const [status, setStatus] = useState<'all' | 'todo' | 'done'>('all')
-  const all = allChallenges()
   const custom = new Set(customChallenges().map((c) => c.id))
+  const all = allChallenges().filter((c) => (!mine || custom.has(c.id)) && (!fixedTopic || c.topic === fixedTopic))
   const topics = useMemo(() => [...new Set([...TOPICS, ...all.map((c) => c.topic)])].sort(), [all])
   const query = q.trim().toLowerCase()
   const list = all.filter((c) =>
@@ -366,7 +366,7 @@ function CheckRow({ c, onChange, onRemove }: { c: CheckSpec; onChange: (c: Check
   )
 }
 
-function ChallengeEditor() {
+export function ChallengeEditor() {
   const add = useApp((s) => s.addCustomChallenge)
   const showToast = useApp((s) => s.showToast)
   const close = useApp((s) => s.closeBank)

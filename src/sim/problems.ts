@@ -6,15 +6,15 @@
 import type { NodeConfig, NodeKind, Pattern } from './types'
 import type { ChallengeSpec, CheckSpec, SpecEdge, SpecNode } from './spec'
 
-const U = (key: string, row: number, label: string, region: string, users: number, rpm: number, read: number, kb: number, pattern: Pattern = 'daily'): SpecNode =>
+export const U = (key: string, row: number, label: string, region: string, users: number, rpm: number, read: number, kb: number, pattern: Pattern = 'daily'): SpecNode =>
   ({ key, kind: 'client', label, col: 0, row, config: { region, users, reqPerUserMin: rpm, readRatio: read, payloadKB: kb, pattern } })
-const N = (key: string, kind: NodeKind, col: number, row: number, label: string, config: Partial<NodeConfig> = {}, from = 0, extra: Partial<SpecNode> = {}): SpecNode =>
+export const N = (key: string, kind: NodeKind, col: number, row: number, label: string, config: Partial<NodeConfig> = {}, from = 0, extra: Partial<SpecNode> = {}): SpecNode =>
   ({ key, kind, col, row, label, config, from, ...extra })
-const E = (a: string, b: string, o: Partial<SpecEdge> = {}): SpecEdge => ({ a, b, ...o })
-const AS = (min: number, max: number, extra: Partial<NodeConfig> = {}): Partial<NodeConfig> =>
+export const E = (a: string, b: string, o: Partial<SpecEdge> = {}): SpecEdge => ({ a, b, ...o })
+export const AS = (min: number, max: number, extra: Partial<NodeConfig> = {}): Partial<NodeConfig> =>
   ({ autoscale: true, instances: min, minInstances: min, maxInstances: max, ...extra })
 
-const C = {
+export const C = {
   lb: { type: 'noDirect', from: ['client'], to: ['app', 'container', 'k8s'], label: 'Servers sit behind a load balancer or gateway', why: 'Health checks route around dead instances, so users never depend on one box.' } as CheckSpec,
   cache: (what: string): CheckSpec => ({ type: 'path', from: ['client'], to: ['cache', 'cdn', 'edgefn'], label: `${what} come from a cache`, why: 'A cache answers in about a millisecond and keeps most reads off the database.' }),
   sqlAz: { type: 'resilient', kinds: ['sql'], label: 'The database survives losing a zone', why: 'A single-zone database is the classic single point of failure. Multi-AZ or a replica fixes it.' } as CheckSpec,

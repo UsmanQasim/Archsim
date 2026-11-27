@@ -105,8 +105,9 @@ export function FlowCanvas() {
         maxZoom={2}
         colorMode={theme}
       >
-        <Background id="dots" variant={BackgroundVariant.Dots} gap={22} size={1.6} color={theme === 'dark' ? '#3a4045' : '#cdd5d1'} />
-        <MiniMap style={{ width: 150, height: 96 }} pannable zoomable nodeColor={(n) => (n.type === 'note' ? '#e8d77a' : CATALOG[(n as SNode).data.kind]?.color ?? '#888')} nodeBorderRadius={4} maskColor={theme === 'dark' ? 'rgba(20,22,25,0.6)' : 'rgba(246,247,245,0.7)'} />
+        <Background id="minor" variant={BackgroundVariant.Lines} gap={24} lineWidth={1} color={theme === 'dark' ? '#25221d' : '#e7dece'} />
+        <Background id="major" variant={BackgroundVariant.Lines} gap={120} lineWidth={1} color={theme === 'dark' ? '#2f2b24' : '#dacdb7'} />
+        <MiniMap style={{ width: 150, height: 96 }} pannable zoomable nodeColor={(n) => (n.type === 'note' ? '#e8d77a' : CATALOG[(n as SNode).data.kind]?.color ?? '#888')} nodeBorderRadius={4} maskColor={theme === 'dark' ? 'rgba(27,25,21,0.6)' : 'rgba(242,235,223,0.7)'} />
         <Controls showInteractive={false} />
         <Panel position="top-left" className="board-tools">
           <button className="btn small" onClick={() => setQuickAdd(true)} title="Search and add a component (Ctrl+K)"><span className="hide-narrow-inline">Add component</span><span className="only-narrow-inline">Add</span> <kbd>Ctrl K</kbd></button>

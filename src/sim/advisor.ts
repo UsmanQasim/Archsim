@@ -110,10 +110,19 @@ export function advise(nodes: GraphNode[], edges: GraphEdge[], res: SimResult | 
         if (!cfg.autoscale) {
           fix = { type: 'patch', nodeId: n.id, patch: { autoscale: true, instances: want, minInstances: Math.max(2, Math.min(cfg.minInstances, want)), maxInstances: Math.max(cfg.maxInstances, want * 3, 20) } }
           fixLabel = `Autoscale (start at ${want})`
+        } else if (m.instances >= cfg.maxInstances) {
+          const max = Math.max(cfg.maxInstances * 2, want)
+          fix = { type: 'patch', nodeId: n.id, patch: { maxInstances: max } }
+          fixLabel = `Raise max to ${max}`
+          detail = `Autoscaling has reached its maximum of ${cfg.maxInstances} instances and still is not enough.`
         } else {
-          fix = { type: 'patch', nodeId: n.id, patch: { maxInstances: Math.max(cfg.maxInstances * 2, want) } }
-          fixLabel = `Raise max to ${Math.max(cfg.maxInstances * 2, want)}`
-          detail = 'Autoscaling may be capped at max instances, or still catching up.'
+          // still scaling up: raising the max would change nothing
+          detail = `Autoscaling is catching up: running ${m.instances} of up to ${cfg.maxInstances}. New instances take a few minutes to start.`
+          if (want > cfg.minInstances) {
+            const min = Math.min(want, cfg.maxInstances)
+            fix = { type: 'patch', nodeId: n.id, patch: { minInstances: min, instances: Math.max(cfg.instances, min) } }
+            fixLabel = `Keep ${min} running`
+          }
         }
       } else if (kind === 'cache') {
         const want = Math.ceil(m.instances * m.util / 0.6)
@@ -171,14 +180,42 @@ export function advise(nodes: GraphNode[], edges: GraphEdge[], res: SimResult | 
 
     // --- queues ---
     if (def.async && (m.backlogAgeSec ?? 0) > 60) {
+      const age = Number.isFinite(m.backlogAgeSec!) ? `${Math.round(m.backlogAgeSec!)} s` : 'growing forever'
       const worker = children(n.id).find((c) => CATALOG[c.data.kind].autoscalable)
-      out.push({
-        id: `backlog-${n.id}`, severity: 'warn', nodeId: n.id,
-        title: `${label} backlog is ${Number.isFinite(m.backlogAgeSec!) ? `${Math.round(m.backlogAgeSec!)} s` : 'growing forever'} behind`,
-        detail: 'Consumers are slower than producers. Users still get fast acks, but work (emails, orders) is delayed.',
-        fix: worker ? { type: 'patch', nodeId: worker.id, patch: { autoscale: true, maxInstances: Math.max(worker.data.config.maxInstances, worker.data.config.instances * 4) } } : undefined,
-        fixLabel: worker ? `Autoscale ${worker.data.label}` : undefined,
-      })
+      const wm = worker && res.nodes[worker.id]
+      const consumed = wm ? wm.inRead + wm.inWrite : 0
+      let severity: Severity = 'warn'
+      let title = `${label} backlog is ${age} behind`
+      let detail = 'Consumers are slower than producers. Users still get fast acks, but work (emails, orders) is delayed.'
+      let fix: Fix | undefined
+      let fixLabel: string | undefined
+      if (worker && wm) {
+        const wc = worker.data.config
+        const max = Math.max(wc.minInstances, wc.maxInstances)
+        // consumers that can keep up with arrivals and clear the backlog in ~10 minutes
+        const need = Math.ceil((wm.instances * (load + (m.backlog ?? 0) / 600)) / Math.max(1e-9, consumed) / 0.8)
+        if (consumed > load * 1.05) {
+          severity = 'tip'
+          title = `${label} backlog is draining (${age} behind)`
+          detail = `${worker.data.label} is working through the backlog faster than new work arrives.`
+        } else if (!wc.autoscale) {
+          fix = { type: 'patch', nodeId: worker.id, patch: { autoscale: true, minInstances: Math.max(1, Math.min(wc.instances, need)), instances: Math.max(wc.instances, 1), maxInstances: Math.max(wc.maxInstances, need * 2) } }
+          fixLabel = `Autoscale ${worker.data.label}`
+        } else if (wm.instances >= max) {
+          const newMax = Math.max(need, max * 2)
+          fix = { type: 'patch', nodeId: worker.id, patch: { maxInstances: newMax } }
+          fixLabel = `Let ${worker.data.label} grow to ${newMax}`
+          detail = `${worker.data.label} is already at its maximum of ${max} instances and still cannot keep up.`
+        } else {
+          detail = `${worker.data.label} is scaling up (running ${wm.instances} of up to ${max}). The backlog will shrink once enough consumers are running.`
+          if (need > wc.minInstances) {
+            const min = Math.min(need, max)
+            fix = { type: 'patch', nodeId: worker.id, patch: { minInstances: min, instances: Math.max(wc.instances, min) } }
+            fixLabel = `Keep ${min} ${worker.data.label} running`
+          }
+        }
+      }
+      out.push({ id: `backlog-${n.id}`, severity, nodeId: n.id, title, detail, fix, fixLabel })
     }
     if (def.async && children(n.id).length === 0 && load > 0) {
       out.push({ id: `noconsumer-${n.id}`, severity: 'tip', nodeId: n.id, title: `${label} has no consumers`, detail: 'Connect Workers (or Functions) to process the messages.' })
@@ -312,6 +349,18 @@ export function advise(nodes: GraphNode[], edges: GraphEdge[], res: SimResult | 
   }
   if (clients.length && nodes.length > 4 && !has('waf') && !has('ratelimiter') && !has('gateway')) {
     out.push({ id: 'no-protect', severity: 'tip', title: 'No rate limiting or WAF at the edge', detail: 'One misbehaving client or bot can overload the whole system. Add a Rate Limiter or API Gateway at the entry point.' })
+  }
+
+  // a fix that would leave every value as it is only frustrates people: drop it
+  for (const a of out) {
+    const f = a.fix
+    if (f?.type === 'patch') {
+      const cfg = byId.get(f.nodeId)?.data.config as Record<string, unknown> | undefined
+      if (cfg && Object.entries(f.patch).every(([k, v]) => cfg[k] === v)) {
+        a.fix = undefined
+        a.fixLabel = undefined
+      }
+    }
   }
 
   const rank: Record<Severity, number> = { critical: 0, warn: 1, tip: 2 }

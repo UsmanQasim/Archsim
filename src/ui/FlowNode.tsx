@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { CATALOG } from '../sim/catalog'
+import { CATALOG, catVars } from '../sim/catalog'
 import { regionShort } from '../sim/regions'
 import { fmtMs, fmtNum, fmtPct, utilColor } from '../format'
 import { useApp, useSim, type SNode } from '../store'
@@ -28,7 +28,7 @@ function FlowNodeView({ id, data, selected }: NodeProps<SNode>) {
   return (
     <div
       className={`fnode ${selected ? 'is-sel' : ''} ${linked === 'linked' ? 'is-linked' : ''} ${linked === 'dim' ? 'is-dim' : ''} ${failed ? 'is-failed' : ''} ${u > 1 && !failed ? 'is-hot' : ''}`}
-      style={{ ['--accent' as string]: def.color }}
+      style={catVars(data.kind)}
     >
       {!isClient && <Handle type="target" position={Position.Left} className="port port-in" />}
       <div className="fnode-head">

@@ -10,6 +10,8 @@ import type { Graph } from './scenarios'
 import type { GraphEdge, GraphNode, NodeConfig, NodeKind, Pattern, SimEdgeData } from './types'
 import { compileSpec } from './spec'
 import { EXTRA_PROBLEMS } from './problems'
+import { COMPANY_SPECS } from './companies'
+import { MORE_PROBLEMS } from './problems2'
 
 export interface DesignCheck {
   label: string
@@ -964,7 +966,7 @@ export const CHALLENGES: Challenge[] = [
   },
 ]
 
-CHALLENGES.push(...EXTRA_PROBLEMS.map(compileSpec))
+CHALLENGES.push(...EXTRA_PROBLEMS.map(compileSpec), ...MORE_PROBLEMS.map(compileSpec), ...COMPANY_SPECS.map(compileSpec))
 
 export const TOPICS = [...new Set(CHALLENGES.map((c) => c.topic))]
 

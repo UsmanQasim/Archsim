@@ -13,6 +13,8 @@ export interface LessonStep {
   title: string
   /** paragraphs */
   text: string[]
+  /** the one sentence to take away from this step */
+  idea?: string
   board?: () => Graph
   task?: { prompt: string; done: (c: Ctx) => boolean; success: string }
 }
@@ -23,7 +25,18 @@ export interface Lesson {
   summary: string
   minutes: number
   concept: string
+  level?: 'Beginner' | 'Intermediate' | 'Advanced'
+  /** what the learner can do afterwards */
+  outcomes?: string[]
   steps: LessonStep[]
+}
+
+export interface Module {
+  id: string
+  title: string
+  /** pastel family colour, as a CSS variable name */
+  color: string
+  lessons: string[]
 }
 
 const U = (key: string, row: number, label: string, region: string, users: number, rpm: number, read: number, kb: number, pattern: Pattern = 'steady'): SpecNode =>
@@ -120,7 +133,7 @@ export const LESSONS: Lesson[] = [
       },
       {
         title: 'What to remember',
-        text: ['Caches trade freshness for speed. Decide how stale a read may be, set expiry to match, and remember that a cold or flushed cache sends everything to the database at once. Try Chaos → Empty every cache to see it.'],
+        text: ['Caches trade freshness for speed. Decide how stale a read may be, set expiry to match, and remember that a cold or flushed cache sends everything to the database at once. Try Break it → Empty every cache to see it.'],
       },
     ],
   },
@@ -130,7 +143,7 @@ export const LESSONS: Lesson[] = [
     steps: [
       {
         title: 'Lose a zone',
-        text: ['Open the Chaos tab and click "USE" under Lose one availability zone. The single-zone database dies and takes everything with it.'],
+        text: ['Open Break it above the board and choose Lose a zone (USE). The single-zone database dies and takes everything with it.'],
         board: board(
           [U('u', 1, 'Users', 'city-nyc', 100000, 3, 0.9, 10), N('lb', 'lb', 1, 1, 'Load Balancer'), N('app', 'app', 2, 1, 'API', { instances: 6 }), N('db', 'sql', 3, 1, 'Postgres', { size: 'M' })],
           [E('u', 'lb'), E('lb', 'app'), E('app', 'db')],
@@ -151,7 +164,7 @@ export const LESSONS: Lesson[] = [
     steps: [
       {
         title: 'A flash sale',
-        text: ['At noon traffic jumps six times. Orders are written straight to the database, which cannot keep up, so orders fail during the spike.', 'Press play and watch around 12:00, or use the time slider in the top bar.'],
+        text: ['At noon traffic jumps six times. Orders are written straight to the database, which cannot keep up, so orders fail during the spike.', 'Press Play and watch around 12:00, or drag the time slider above the board.'],
         board: board(
           [U('u', 1, 'Shoppers', 'city-nyc', 200000, 1, 0.3, 4, 'spike'), N('lb', 'lb', 1, 1, 'Load Balancer'), N('app', 'app', 2, 1, 'Shop API', { autoscale: true, instances: 20, minInstances: 20, maxInstances: 200 }), N('db', 'sql', 4, 1, 'Orders DB', { size: 'L' })],
           [E('u', 'lb'), E('lb', 'app'), E('app', 'db')],
@@ -195,7 +208,7 @@ export const LESSONS: Lesson[] = [
     steps: [
       {
         title: 'Serving video from the origin',
-        text: ['Every video byte flows through your servers and out of your region. Look at the cost tab: data transfer is most of the bill.'],
+        text: ['Every video byte flows through your servers and out of your region. Look at Per month above the board: most of it is data transfer.'],
         board: board(
           [U('u', 1, 'Viewers', 'city-london', 100000, 1, 1, 3000), N('lb', 'lb', 1, 1, 'Load Balancer', { region: 'us-east-1' }), N('app', 'app', 2, 1, 'Media API', { region: 'us-east-1', instances: 30 }), N('s3', 'storage', 3, 1, 'Videos', { region: 'us-east-1' })],
           [E('u', 'lb'), E('lb', 'app'), E('app', 's3')],
@@ -215,7 +228,7 @@ export const LESSONS: Lesson[] = [
     steps: [
       {
         title: 'Three retries on every call',
-        text: ['The API retries failed database calls three times. Open Chaos and set Traffic surge to ×2.', 'The database was a little short of capacity; now every failure comes back up to four times, and nearly nothing succeeds.'],
+        text: ['The API retries failed database calls three times. Open Break it above the board and set Traffic to ×2.', 'The database was a little short of capacity; now every failure comes back up to four times, and nearly nothing succeeds.'],
         board: board(
           [U('u', 1, 'Users', 'city-nyc', 150000, 2, 0.8, 5), N('lb', 'lb', 1, 1, 'Load Balancer'), N('app', 'app', 2, 1, 'API', { instances: 30 }), N('db', 'sql', 3, 1, 'Postgres', { size: 'L' })],
           [E('u', 'lb'), E('lb', 'app'), E('app', 'db', { retries: 3 })],
@@ -230,3 +243,64 @@ export const LESSONS: Lesson[] = [
     ],
   },
 ]
+
+// ---------------------------------------------------------------- course structure
+const META: Record<string, { level: Lesson['level']; outcomes: string[]; ideas: (string | undefined)[] }> = {
+  latency: {
+    level: 'Beginner',
+    outcomes: ['Why distance adds latency, however fast the server is', 'Roughly how many milliseconds an ocean costs', 'Why compute and data should sit near users'],
+    ideas: ['Every request is a round trip. Light in fibre covers about 100 km per millisecond there and back.', 'Moving the servers is often the biggest speed-up you can make.', undefined],
+  },
+  scaling: {
+    level: 'Beginner',
+    outcomes: ['What a single server can and cannot carry', 'What a load balancer does', 'Why stateless servers make scaling easy'],
+    ideas: ['A server has a ceiling. Past it, requests queue up and then get dropped.', 'Scale out: more identical servers behind a load balancer.', undefined],
+  },
+  caching: {
+    level: 'Beginner',
+    outcomes: ['How a cache takes load off a database', 'Why the hit rate is the number to watch', 'What happens when a cache goes cold'],
+    ideas: ['Read-heavy data is usually asked for again and again.', 'A cache answers repeated reads from memory in about a millisecond.', undefined],
+  },
+  replication: {
+    level: 'Intermediate',
+    outcomes: ['What an availability zone is', 'How a standby keeps a database up', 'What redundancy costs'],
+    ideas: ['One copy of anything is a single point of failure.', 'A synchronous standby in another zone takes over in seconds.', undefined],
+  },
+  queues: {
+    level: 'Intermediate',
+    outcomes: ['How a queue turns a spike into a backlog', 'When work can be done later', 'Why backlog age matters more than length'],
+    ideas: ['Spikes are short. Databases cannot grow in seconds.', 'Accept now, process soon: the queue absorbs the burst.', undefined],
+  },
+  sharding: {
+    level: 'Intermediate',
+    outcomes: ['Why replicas do not help writes', 'How sharding spreads writes', 'How to pick a shard key'],
+    ideas: ['Every write goes to the primary, however many replicas you add.', 'Split the data so each shard takes a share of the writes.', undefined],
+  },
+  cdn: {
+    level: 'Beginner',
+    outcomes: ['Why big files should not come from your servers', 'How a CDN cuts both latency and cost', 'What belongs on a CDN'],
+    ideas: ['Data transfer out of the cloud is billed per gigabyte, and video is a lot of gigabytes.', 'Edge locations near viewers serve the copies; your origin sends each file once.', undefined],
+  },
+  retries: {
+    level: 'Advanced',
+    outcomes: ['How retries multiply load on a struggling service', 'What a circuit breaker does', 'How to retry safely'],
+    ideas: ['Each retry is another request on a target that is already failing.', 'A breaker stops calling a target that is mostly failing, so it can recover.', undefined],
+  },
+}
+for (const l of LESSONS) {
+  const m = META[l.id]
+  if (!m) continue
+  l.level ??= m.level
+  l.outcomes ??= m.outcomes
+  l.steps.forEach((s, i) => (s.idea ??= m.ideas[i]))
+}
+
+export const MODULES: Module[] = [
+  { id: 'foundations', title: 'Foundations', color: '--cat-traffic', lessons: ['latency', 'scaling'] },
+  { id: 'data', title: 'Data', color: '--cat-data', lessons: ['caching', 'sharding'] },
+  { id: 'reliability', title: 'Reliability', color: '--cat-messaging', lessons: ['replication', 'retries'] },
+  { id: 'async', title: 'Async and edge', color: '--cat-edge', lessons: ['queues', 'cdn'] },
+]
+
+export const lessonModule = (id: string) => MODULES.find((m) => m.lessons.includes(id))
+export const LESSON_ORDER = MODULES.flatMap((m) => m.lessons)

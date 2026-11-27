@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CATALOG, CATEGORIES, KIND_ORDER } from '../sim/catalog'
+import { CATALOG, CATEGORIES, KIND_ORDER, catVars } from '../sim/catalog'
 import { closeDrawerIfOverlay } from '../layout'
 import { useApp } from '../store'
 import { DND_MIME } from './FlowCanvas'
@@ -46,7 +46,7 @@ export function Palette() {
                   }}
                   onClick={() => { addNode(d.kind); closeDrawerIfOverlay() }}
                   title={`${d.desc}\n\nWhen: ${d.when}`}
-                  style={{ ['--accent' as string]: d.color }}
+                  style={catVars(d.kind)}
                 >
                   <span className="tile"><KindIcon kind={d.kind} /></span>
                   <span className="pal-text">

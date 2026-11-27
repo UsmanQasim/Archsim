@@ -11,6 +11,7 @@ import { findLimit, steadyState, type LimitReport } from './sim/analysis'
 import { TEMPLATES, findChallenge, setCustomChallenges, uid, type Graph } from './sim/scenarios'
 import { parseSpec, type ChallengeSpec } from './sim/spec'
 import { LESSONS } from './learn'
+import { useRoute } from './route'
 import type { ResultPayload } from './share'
 import {
   emptyChaos, emptyRuntime, type Chaos, type NodeConfig, type NodeKind, type Provider, type Runtime, type SimEdgeData, type SimNodeData, type SimResult,
@@ -115,6 +116,10 @@ interface AppState {
   submitOpen: boolean
   setSubmitOpen: (o: boolean) => void
   lesson: { id: string; step: number } | null
+  /** whose board is on the canvas: the simulator's own design (saved) or a lesson's (never saved over it) */
+  boardOwner: 'lab' | 'lesson'
+  /** put the simulator's saved design back after a lesson borrowed the board */
+  restoreLab: () => void
   startLesson: (id: string) => void
   lessonTo: (step: number) => void
   exitLesson: () => void
@@ -143,7 +148,7 @@ interface AppState {
   setDockTab: (t: DockTab) => void
   setTitle: (t: string) => void
 
-  loadGraph: (g: Graph, opts: { title: string; challengeId?: string | null; keepGuide?: boolean; keepDock?: boolean; notes?: NNode[] }) => void
+  loadGraph: (g: Graph, opts: { title: string; challengeId?: string | null; keepGuide?: boolean; keepDock?: boolean; notes?: NNode[]; owner?: 'lab' | 'lesson' }) => void
   startGuide: (challengeId: string) => void
   guideTo: (step: number) => void
   exitGuide: () => void
@@ -219,8 +224,14 @@ export const useApp = create<AppState>((set, get) => ({
   saveStatus: 'saved',
   customVersion: 0,
   bank: { open: false, tab: 'problems' },
-  openBank: (tab) => set((s) => ({ bank: { open: true, tab: tab ?? s.bank.tab } })),
-  closeBank: () => set((s) => ({ bank: { ...s.bank, open: false } })),
+  openBank: (tab) => {
+    if (tab === 'learn') useRoute.getState().go({ page: 'learn' })
+    else useRoute.getState().go({ page: 'library', a: tab === 'create' ? 'create' : 'problems' })
+  },
+  closeBank: () => {
+    set((s) => ({ bank: { ...s.bank, open: false } }))
+    useRoute.getState().go({ page: 'lab' })
+  },
   addCustomChallenge: (spec, start) => {
     const list = [...loadJSON<ChallengeSpec[]>('archsim:custom', []).filter((x) => x.id !== spec.id), spec]
     saveJSON('archsim:custom', list)
@@ -239,11 +250,21 @@ export const useApp = create<AppState>((set, get) => ({
   submitOpen: false,
   setSubmitOpen: (o) => set({ submitOpen: o }),
   lesson: null,
+  boardOwner: 'lab',
+  restoreLab: () => {
+    if (get().boardOwner === 'lab') return
+    set({ lesson: null, boardOwner: 'lab' })
+    if (!loadSaved()) get().loadTemplate('three-tier')
+    useApp.setState({ past: [], future: [] })
+  },
   startLesson: (id) => {
     const l = LESSONS.find((x) => x.id === id)
     if (!l) return
-    get().loadGraph(l.steps[0].board!(), { title: `Lesson: ${l.title}` })
-    set((s) => ({ lesson: { id, step: 0 }, bank: { ...s.bank, open: false }, dockTab: 'learn', view: '2d', playing: true }))
+    // the lesson borrows the canvas; the simulator's design stays saved and comes back after
+    flushSave()
+    set({ boardOwner: 'lesson' })
+    get().loadGraph(l.steps[0].board!(), { title: `Lesson: ${l.title}`, owner: 'lesson' })
+    set((s) => ({ lesson: { id, step: 0 }, bank: { ...s.bank, open: false }, view: '2d', playing: true, past: [], future: [] }))
   },
   lessonTo: (step) => {
     const cur = get().lesson
@@ -251,10 +272,10 @@ export const useApp = create<AppState>((set, get) => ({
     if (!cur || !l) return
     const st = Math.max(0, Math.min(l.steps.length - 1, step))
     const b = l.steps[st].board
-    if (b && st !== cur.step) get().loadGraph(b(), { title: `Lesson: ${l.title}`, keepDock: true })
-    set({ lesson: { id: cur.id, step: st }, dockTab: 'learn' })
+    if (b && st !== cur.step) get().loadGraph(b(), { title: `Lesson: ${l.title}`, keepDock: true, owner: 'lesson' })
+    set({ lesson: { id: cur.id, step: st } })
   },
-  exitLesson: () => set({ lesson: null, dockTab: 'advisor' }),
+  exitLesson: () => set({ lesson: null }),
   nodes: [],
   edges: [],
   selection: null,
@@ -446,12 +467,14 @@ export const useApp = create<AppState>((set, get) => ({
   setDockTab: (dockTab) => set({ dockTab }),
   setTitle: (title) => set({ title }),
 
-  loadGraph: (g, { title, challengeId = null, keepGuide = false, keepDock = false, notes = [] }) => {
+  loadGraph: (g, { title, challengeId = null, keepGuide = false, keepDock = false, notes = [], owner = 'lab' }) => {
     const s = get()
+    // anything but a lesson becomes the simulator's design
+    if (owner === 'lab' && s.boardOwner === 'lesson') set({ lesson: null, boardOwner: 'lab', past: [], future: [] })
     set({
       notes,
       guide: keepGuide ? s.guide : null,
-      past: s.nodes.length ? [...s.past.slice(-79), snap(s)] : s.past,
+      past: s.nodes.length && owner === s.boardOwner ? [...s.past.slice(-79), snap(s)] : [],
       future: [],
       nodes: toNodes(g),
       edges: toEdges(g),
@@ -852,6 +875,8 @@ const LS_KEY = 'archsim:v1'
 
 export function initFromUrlOrStorage() {
   const st = useApp.getState()
+  // a lesson already has the board (Learn opened first); the saved design stays in storage for later
+  if (st.boardOwner === 'lesson') return
   const c = location.hash.match(/#c=(.+)$/)
   if (c) {
     try {
@@ -905,16 +930,40 @@ export function initFromUrlOrStorage() {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined
+function writeSave() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(serialize(useApp.getState())))
+    useApp.setState({ saveStatus: 'saved' })
+  } catch {
+    useApp.setState({ saveStatus: 'error' })
+  }
+}
+/** write a pending save now, e.g. before a lesson borrows the canvas */
+function flushSave() {
+  if (!saveTimer) return
+  clearTimeout(saveTimer)
+  saveTimer = undefined
+  if (useApp.getState().boardOwner === 'lab') writeSave()
+}
+/** load the simulator's saved design; false if there is none */
+function loadSaved(): boolean {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    if (!raw) return false
+    const g = deserialize(JSON.parse(raw))
+    useApp.getState().loadGraph(g.graph, { title: g.title, challengeId: g.challengeId, notes: g.notes })
+    return true
+  } catch {
+    return false
+  }
+}
 useApp.subscribe((s, prev) => {
   if (s.nodes === prev.nodes && s.edges === prev.edges && s.notes === prev.notes && s.title === prev.title && s.challengeId === prev.challengeId) return
+  if (s.boardOwner !== 'lab') return
   clearTimeout(saveTimer)
   if (s.saveStatus !== 'saving') useApp.setState({ saveStatus: 'saving' })
   saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(serialize(useApp.getState())))
-      useApp.setState({ saveStatus: 'saved' })
-    } catch {
-      useApp.setState({ saveStatus: 'error' })
-    }
+    saveTimer = undefined
+    if (useApp.getState().boardOwner === 'lab') writeSave()
   }, 600)
 })
